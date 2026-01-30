@@ -1,7 +1,8 @@
 <?php
 /**
- * CRM SYSTEM v1.0 - Полнофункциональная CRM в одном файле
+ * CRM SYSTEM v1.0 - Полнофункциональная CRM с веб-интерфейсом
  * Архитектура: Clean Architecture + DDD + Hexagonal
+ * Веб-интерфейс: Tailwind CSS
  * PHP 8.1+
  */
 
@@ -9,18 +10,17 @@ declare(strict_types=1);
 
 // ==================== КОНСТАНТЫ И НАСТРОЙКИ ====================
 const APP_VERSION = '1.0.0';
-const ENV_DEV = 'development';
-const ENV_PROD = 'production';
+const APP_NAME = 'CRM Pro';
+const SESSION_KEY = 'crm_auth';
 
-// Режим работы (менять при необходимости)
-define('CRM_ENV', ENV_DEV);
-define('CRM_DEBUG', CRM_ENV === ENV_DEV);
+// Режим отладки
+define('CRM_DEBUG', true);
+
+// Начало сессии
+session_start();
 
 // ==================== VALUE OBJECTS ====================
 
-/**
- * Иммутабельный объект Email с валидацией
- */
 final class Email implements \Stringable
 {
     private string $value;
@@ -33,78 +33,38 @@ final class Email implements \Stringable
         $this->value = strtolower(trim($email));
     }
     
-    public function getValue(): string
-    {
-        return $this->value;
-    }
-    
-    public function getDomain(): string
-    {
-        return substr($this->value, strpos($this->value, '@') + 1);
-    }
-    
-    public function equals(self $other): bool
-    {
-        return $this->value === $other->value;
-    }
-    
-    public function __toString(): string
-    {
-        return $this->value;
-    }
+    public function getValue(): string { return $this->value; }
+    public function __toString(): string { return $this->value; }
 }
 
-/**
- * Value Object для номера телефона
- */
 final class Phone implements \Stringable
 {
     private string $value;
-    private string $countryCode;
     
-    public function __construct(string $phone, string $countryCode = '7')
+    public function __construct(string $phone)
     {
         $cleaned = preg_replace('/[^0-9]/', '', $phone);
-        
         if (strlen($cleaned) < 10) {
             throw new \InvalidArgumentException("Некорректный номер телефона");
         }
-        
         $this->value = $cleaned;
-        $this->countryCode = $countryCode;
-    }
-    
-    public function getFullNumber(): string
-    {
-        return '+' . $this->countryCode . $this->value;
     }
     
     public function getFormatted(): string
     {
-        $num = $this->value;
-        return '+7 (' . substr($num, 0, 3) . ') ' . substr($num, 3, 3) . '-' . substr($num, 6, 2) . '-' . substr($num, 8, 2);
+        return '+7 (' . substr($this->value, 0, 3) . ') ' . substr($this->value, 3, 3) . '-' . substr($this->value, 6, 2) . '-' . substr($this->value, 8, 2);
     }
     
-    public function __toString(): string
-    {
-        return $this->getFullNumber();
-    }
+    public function __toString(): string { return $this->getFormatted(); }
 }
 
-/**
- * Value Object для денежных сумм
- */
 final class Money
 {
-    private int $amount; // В копейках/центах
+    private int $amount;
     private string $currency;
     
     public function __construct(int $amount, string $currency = 'RUB')
     {
-        if ($amount < 0) {
-            throw new \InvalidArgumentException("Сумма не может быть отрицательной");
-        }
-        
         $this->amount = $amount;
         $this->currency = strtoupper($currency);
     }
@@ -114,48 +74,8 @@ final class Money
         return new self((int)($amount * 100), $currency);
     }
     
-    public function add(self $other): self
-    {
-        if ($this->currency !== $other->currency) {
-            throw new \InvalidArgumentException("Валюты должны совпадать");
-        }
-        
-        return new self($this->amount + $other->amount, $this->currency);
-    }
-    
-    public function subtract(self $other): self
-    {
-        if ($this->currency !== $other->currency) {
-            throw new \InvalidArgumentException("Валюты должны совпадать");
-        }
-        
-        $newAmount = $this->amount - $other->amount;
-        if ($newAmount < 0) {
-            throw new \InvalidArgumentException("Результат не может быть отрицательным");
-        }
-        
-        return new self($newAmount, $this->currency);
-    }
-    
-    public function getAmount(): int
-    {
-        return $this->amount;
-    }
-    
-    public function getFloatAmount(): float
-    {
-        return $this->amount / 100;
-    }
-    
-    public function getCurrency(): string
-    {
-        return $this->currency;
-    }
-    
-    public function equals(self $other): bool
-    {
-        return $this->amount === $other->amount && $this->currency === $other->currency;
-    }
+    public function getFloatAmount(): float { return $this->amount / 100; }
+    public function getCurrency(): string { return $this->currency; }
     
     public function __toString(): string
     {
@@ -163,74 +83,16 @@ final class Money
     }
 }
 
-/**
- * Источник лида (UTM метки)
- */
-final class LeadSource
-{
-    private string $source; // google, yandex, direct
-    private string $medium; // cpc, organic, email
-    private string $campaign;
-    private string $content;
-    private string $term;
-    
-    public function __construct(
-        string $source = 'direct',
-        string $medium = 'none',
-        string $campaign = '',
-        string $content = '',
-        string $term = ''
-    ) {
-        $this->source = $source;
-        $this->medium = $medium;
-        $this->campaign = $campaign;
-        $this->content = $content;
-        $this->term = $term;
-    }
-    
-    public static function fromArray(array $data): self
-    {
-        return new self(
-            $data['source'] ?? 'direct',
-            $data['medium'] ?? 'none',
-            $data['campaign'] ?? '',
-            $data['content'] ?? '',
-            $data['term'] ?? ''
-        );
-    }
-    
-    public function toArray(): array
-    {
-        return [
-            'source' => $this->source,
-            'medium' => $this->medium,
-            'campaign' => $this->campaign,
-            'content' => $this->content,
-            'term' => $this->term,
-        ];
-    }
-    
-    public function getSource(): string { return $this->source; }
-    public function getMedium(): string { return $this->medium; }
-    public function getCampaign(): string { return $this->campaign; }
-    public function getContent(): string { return $this->content; }
-    public function getTerm(): string { return $this->term; }
-}
-
-/**
- * Статус лида (Value Object)
- */
 final class LeadStatus
 {
     private string $value;
-    private array $allowedTransitions;
     
     private const STATUSES = [
-        'new' => ['in_progress', 'disqualified'],
-        'in_progress' => ['qualified', 'disqualified'],
-        'qualified' => ['converted', 'disqualified'],
-        'converted' => [],
-        'disqualified' => [],
+        'new' => ['name' => 'Новый', 'color' => 'blue'],
+        'in_progress' => ['name' => 'В работе', 'color' => 'yellow'],
+        'qualified' => ['name' => 'Квалифицирован', 'color' => 'purple'],
+        'converted' => ['name' => 'Конвертирован', 'color' => 'green'],
+        'disqualified' => ['name' => 'Отказ', 'color' => 'red'],
     ];
     
     public function __construct(string $status)
@@ -238,265 +100,48 @@ final class LeadStatus
         if (!isset(self::STATUSES[$status])) {
             throw new \InvalidArgumentException("Недопустимый статус лида: {$status}");
         }
-        
         $this->value = $status;
-        $this->allowedTransitions = self::STATUSES[$status];
     }
     
-    public function canTransitionTo(string $newStatus): bool
+    public function getValue(): string { return $this->value; }
+    public function getName(): string { return self::STATUSES[$this->value]['name']; }
+    public function getColor(): string { return self::STATUSES[$this->value]['color']; }
+    public function __toString(): string { return $this->value; }
+}
+
+final class LeadSource
+{
+    private string $source;
+    
+    private const SOURCES = [
+        'website' => ['name' => 'Сайт', 'icon' => 'globe'],
+        'phone' => ['name' => 'Телефон', 'icon' => 'phone'],
+        'email' => ['name' => 'Email', 'icon' => 'envelope'],
+        'referral' => ['name' => 'Рекомендация', 'icon' => 'user-group'],
+        'social' => ['name' => 'Соцсети', 'icon' => 'chat'],
+    ];
+    
+    public function __construct(string $source)
     {
-        return in_array($newStatus, $this->allowedTransitions, true);
+        $this->source = $source;
     }
     
-    public function getValue(): string
-    {
-        return $this->value;
-    }
-    
-    public function isFinal(): bool
-    {
-        return empty($this->allowedTransitions);
-    }
-    
-    public function equals(self $other): bool
-    {
-        return $this->value === $other->value;
-    }
-    
-    public function __toString(): string
-    {
-        return $this->value;
-    }
-}
-
-/**
- * Приоритет лида/задачи
- */
-final class Priority
-{
-    private string $value;
-    
-    public const LOW = 'low';
-    public const MEDIUM = 'medium';
-    public const HIGH = 'high';
-    public const CRITICAL = 'critical';
-    
-    private const ALLOWED = [self::LOW, self::MEDIUM, self::HIGH, self::CRITICAL];
-    
-    public function __construct(string $priority)
-    {
-        if (!in_array($priority, self::ALLOWED, true)) {
-            throw new \InvalidArgumentException("Недопустимый приоритет: {$priority}");
-        }
-        
-        $this->value = $priority;
-    }
-    
-    public function getValue(): string
-    {
-        return $this->value;
-    }
-    
-    public function isHigherThan(self $other): bool
-    {
-        $levels = array_flip(self::ALLOWED);
-        return $levels[$this->value] > $levels[$other->value];
-    }
-    
-    public function __toString(): string
-    {
-        return $this->value;
-    }
-}
-
-// ==================== ИНТЕРФЕЙСЫ ====================
-
-/**
- * Интерфейс пользователя системы
- */
-interface UserInterface
-{
-    public function getId(): string;
-    public function getEmail(): Email;
-    public function getPhone(): ?Phone;
-    public function getFullName(): string;
-    public function getRoles(): array;
-    public function hasRole(string $role): bool;
-    public function isActive(): bool;
-}
-
-/**
- * Интерфейс для проверки прав доступа
- */
-interface AccessSubjectInterface extends UserInterface
-{
-    public function getPermissions(): array;
-    public function hasPermission(string $permission): bool;
-}
-
-/**
- * Менеджер разрешений
- */
-interface PermissionManagerInterface
-{
-    public function isGranted(AccessSubjectInterface $user, string $permission, ?object $subject = null): bool;
-    public function grantRole(string $role, array $permissions): void;
-    public function revokeRole(string $role): void;
-}
-
-/**
- * Аутентификатор
- */
-interface AuthenticatorInterface
-{
-    public function authenticate(string $login, string $password): ?AccessSubjectInterface;
-    public function logout(): void;
-    public function getCurrentUser(): ?AccessSubjectInterface;
-}
-
-/**
- * Интерфейс лида
- */
-interface LeadInterface
-{
-    public function getId(): string;
-    public function getTitle(): string;
-    public function getStatus(): LeadStatus;
-    public function getSource(): LeadSource;
-    public function getAssignedTo(): ?AccessSubjectInterface;
-    public function getCreatedAt(): \DateTimeInterface;
-    public function getUpdatedAt(): \DateTimeInterface;
-    
-    public function changeStatus(LeadStatus $newStatus): void;
-    public function assignTo(AccessSubjectInterface $user): void;
-    public function addNote(string $note): void;
-    public function getNotes(): array;
-}
-
-/**
- * Репозиторий лидов
- */
-interface LeadRepositoryInterface
-{
-    public function findById(string $id): ?LeadInterface;
-    public function findByEmail(string $email): array;
-    public function findByStatus(string $status): array;
-    public function save(LeadInterface $lead): void;
-    public function delete(string $id): void;
-    
-    public function search(array $criteria, int $limit = 50, int $offset = 0): array;
-    public function count(array $criteria): int;
-}
-
-/**
- * Конвертер лидов в сделки
- */
-interface LeadConverterInterface
-{
-    public function convert(LeadInterface $lead, array $options = []): DealInterface;
-    public function canConvert(LeadInterface $lead): bool;
-}
-
-/**
- * Интерфейс сделки
- */
-interface DealInterface
-{
-    public function getId(): string;
-    public function getTitle(): string;
-    public function getAmount(): Money;
-    public function getStage(): string;
-    public function getLead(): ?LeadInterface;
-    public function getOwner(): AccessSubjectInterface;
-    public function getProbability(): int; // 0-100%
-    public function getCloseDate(): ?\DateTimeInterface;
-    
-    public function updateStage(string $stage): void;
-    public function updateAmount(Money $amount): void;
-    public function setProbability(int $probability): void;
-    public function close(bool $won, ?string $reason = null): void;
-}
-
-/**
- * Интерфейс сообщения
- */
-interface MessageInterface
-{
-    public function getId(): string;
-    public function getType(): string; // email, sms, call, chat
-    public function getDirection(): string; // incoming, outgoing
-    public function getSubject(): string;
-    public function getBody(): string;
-    public function getFrom(): string;
-    public function getTo(): array;
-    public function getSentAt(): \DateTimeInterface;
-    public function getStatus(): string; // sent, delivered, read, failed
-    
-    public function markAsRead(): void;
-    public function markAsFailed(string $reason): void;
-}
-
-/**
- * Провайдер коммуникаций
- */
-interface CommunicationProviderInterface
-{
-    public function send(MessageInterface $message): bool;
-    public function supports(string $channelType): bool;
-    public function getName(): string;
-    public function testConnection(): bool;
-}
-
-/**
- * Шина сообщений (Command/Event Bus)
- */
-interface MessageBusInterface
-{
-    public function dispatch(object $message): void;
-    public function subscribe(string $eventClass, callable $handler): void;
-    public function publish(object $event): void;
-}
-
-/**
- * Интерфейс хранилища
- */
-interface StorageInterface
-{
-    public function put(string $path, string $content, array $metadata = []): string;
-    public function get(string $path): string;
-    public function delete(string $path): bool;
-    public function exists(string $path): bool;
-    public function getUrl(string $path): string;
-}
-
-/**
- * Интерфейс аудита
- */
-interface AuditorInterface
-{
-    public function log(string $action, array $data, ?string $userId = null): void;
-    public function getLogs(array $criteria = [], int $limit = 100): array;
-    public function getUserActivity(string $userId, \DateTimeInterface $from, \DateTimeInterface $to): array;
+    public function getName(): string { return self::SOURCES[$this->source]['name'] ?? $this->source; }
+    public function getIcon(): string { return self::SOURCES[$this->source]['icon'] ?? 'question-mark'; }
+    public function __toString(): string { return $this->source; }
 }
 
 // ==================== СУЩНОСТИ ====================
 
-/**
- * Пользователь системы
- */
-class User implements AccessSubjectInterface
+class User
 {
     private string $id;
     private Email $email;
-    private ?Phone $phone;
     private string $firstName;
     private string $lastName;
     private string $passwordHash;
-    private array $roles;
-    private array $permissions;
-    private bool $isActive;
+    private string $role;
     private \DateTimeImmutable $createdAt;
-    private \DateTimeImmutable $updatedAt;
     
     public function __construct(
         string $id,
@@ -504,159 +149,58 @@ class User implements AccessSubjectInterface
         string $firstName,
         string $lastName,
         string $passwordHash,
-        array $roles = ['user'],
-        array $permissions = [],
-        ?Phone $phone = null
+        string $role = 'user'
     ) {
         $this->id = $id;
         $this->email = $email;
-        $this->phone = $phone;
         $this->firstName = $firstName;
         $this->lastName = $lastName;
         $this->passwordHash = $passwordHash;
-        $this->roles = $roles;
-        $this->permissions = $permissions;
-        $this->isActive = true;
+        $this->role = $role;
         $this->createdAt = new \DateTimeImmutable();
-        $this->updatedAt = new \DateTimeImmutable();
     }
     
-    // Реализация интерфейса UserInterface
     public function getId(): string { return $this->id; }
     public function getEmail(): Email { return $this->email; }
-    public function getPhone(): ?Phone { return $this->phone; }
     public function getFullName(): string { return $this->firstName . ' ' . $this->lastName; }
-    public function getRoles(): array { return $this->roles; }
-    public function hasRole(string $role): bool { return in_array($role, $this->roles, true); }
-    public function isActive(): bool { return $this->isActive; }
-    
-    // Реализация AccessSubjectInterface
-    public function getPermissions(): array { return $this->permissions; }
-    public function hasPermission(string $permission): bool { return in_array($permission, $this->permissions, true); }
-    
-    // Бизнес-методы
-    public function activate(): void
-    {
-        $this->isActive = true;
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-    
-    public function deactivate(): void
-    {
-        $this->isActive = false;
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-    
-    public function addRole(string $role): void
-    {
-        if (!$this->hasRole($role)) {
-            $this->roles[] = $role;
-            $this->updatedAt = new \DateTimeImmutable();
-        }
-    }
-    
-    public function removeRole(string $role): void
-    {
-        $this->roles = array_filter($this->roles, fn($r) => $r !== $role);
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-    
-    public function addPermission(string $permission): void
-    {
-        if (!$this->hasPermission($permission)) {
-            $this->permissions[] = $permission;
-            $this->updatedAt = new \DateTimeImmutable();
-        }
-    }
+    public function getFirstName(): string { return $this->firstName; }
+    public function getLastName(): string { return $this->lastName; }
+    public function getRole(): string { return $this->role; }
+    public function getCreatedAt(): \DateTimeInterface { return $this->createdAt; }
     
     public function verifyPassword(string $password): bool
     {
         return password_verify($password, $this->passwordHash);
     }
     
-    public function changePassword(string $newPassword): void
-    {
-        $this->passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-    
-    public function getCreatedAt(): \DateTimeInterface { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeInterface { return $this->updatedAt; }
+    public function isAdmin(): bool { return $this->role === 'admin'; }
+    public function isManager(): bool { return $this->role === 'manager'; }
+    public function isUser(): bool { return $this->role === 'user'; }
 }
 
-/**
- * Роль пользователя
- */
-class Role
-{
-    private string $name;
-    private string $description;
-    private array $permissions;
-    private bool $isSystem;
-    
-    public function __construct(string $name, string $description = '', array $permissions = [], bool $isSystem = false)
-    {
-        $this->name = $name;
-        $this->description = $description;
-        $this->permissions = $permissions;
-        $this->isSystem = $isSystem;
-    }
-    
-    public function getName(): string { return $this->name; }
-    public function getDescription(): string { return $this->description; }
-    public function getPermissions(): array { return $this->permissions; }
-    public function isSystem(): bool { return $this->isSystem; }
-    
-    public function addPermission(string $permission): void
-    {
-        if (!in_array($permission, $this->permissions, true)) {
-            $this->permissions[] = $permission;
-        }
-    }
-    
-    public function removePermission(string $permission): void
-    {
-        $this->permissions = array_filter($this->permissions, fn($p) => $p !== $permission);
-    }
-    
-    public function hasPermission(string $permission): bool
-    {
-        return in_array($permission, $this->permissions, true);
-    }
-}
-
-/**
- * Лид - потенциальный клиент
- */
-class Lead implements LeadInterface
+class Lead
 {
     private string $id;
     private string $title;
+    private string $contactName;
+    private Email $contactEmail;
+    private ?Phone $contactPhone;
     private LeadStatus $status;
     private LeadSource $source;
-    private ?AccessSubjectInterface $assignedTo;
+    private ?string $company;
+    private ?Money $estimatedValue;
+    private ?string $assignedTo;
     private array $notes;
     private \DateTimeImmutable $createdAt;
     private \DateTimeImmutable $updatedAt;
-    
-    // Контактная информация
-    private string $contactName;
-    private string $contactEmail;
-    private ?string $contactPhone;
-    private ?string $company;
-    
-    // Дополнительные данные
-    private array $customFields;
-    private ?int $estimatedValue;
-    private string $currency;
     
     public function __construct(
         string $id,
         string $title,
         string $contactName,
-        string $contactEmail,
+        Email $contactEmail,
         LeadSource $source,
-        ?string $contactPhone = null,
+        ?Phone $contactPhone = null,
         ?string $company = null
     ) {
         $this->id = $id;
@@ -666,119 +210,77 @@ class Lead implements LeadInterface
         $this->contactPhone = $contactPhone;
         $this->company = $company;
         $this->source = $source;
-        
         $this->status = new LeadStatus('new');
-        $this->notes = [];
-        $this->customFields = [];
         $this->estimatedValue = null;
-        $this->currency = 'RUB';
         $this->assignedTo = null;
+        $this->notes = [];
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
     
-    // Реализация интерфейса LeadInterface
     public function getId(): string { return $this->id; }
     public function getTitle(): string { return $this->title; }
+    public function getContactName(): string { return $this->contactName; }
+    public function getContactEmail(): Email { return $this->contactEmail; }
+    public function getContactPhone(): ?Phone { return $this->contactPhone; }
     public function getStatus(): LeadStatus { return $this->status; }
     public function getSource(): LeadSource { return $this->source; }
-    public function getAssignedTo(): ?AccessSubjectInterface { return $this->assignedTo; }
+    public function getCompany(): ?string { return $this->company; }
+    public function getEstimatedValue(): ?Money { return $this->estimatedValue; }
+    public function getAssignedTo(): ?string { return $this->assignedTo; }
+    public function getNotes(): array { return $this->notes; }
     public function getCreatedAt(): \DateTimeInterface { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeInterface { return $this->updatedAt; }
     
     public function changeStatus(LeadStatus $newStatus): void
     {
-        if (!$this->status->canTransitionTo($newStatus->getValue())) {
-            throw new \DomainException(
-                "Невозможно перевести лид из статуса '{$this->status}' в '{$newStatus}'"
-            );
-        }
-        
         $this->status = $newStatus;
         $this->updatedAt = new \DateTimeImmutable();
-        
-        // Добавляем автоматическую заметку о смене статуса
-        $this->addNote("Статус изменен на: {$newStatus}");
+        $this->addNote("Статус изменен на: " . $newStatus->getName());
     }
     
-    public function assignTo(AccessSubjectInterface $user): void
+    public function assignTo(string $userId): void
     {
-        $this->assignedTo = $user;
+        $this->assignedTo = $userId;
         $this->updatedAt = new \DateTimeImmutable();
-        $this->addNote("Лид назначен на: {$user->getFullName()}");
+        $this->addNote("Лид назначен");
+    }
+    
+    public function setEstimatedValue(?Money $value): void
+    {
+        $this->estimatedValue = $value;
+        $this->updatedAt = new \DateTimeImmutable();
     }
     
     public function addNote(string $note): void
     {
-        $noteEntry = [
+        $this->notes[] = [
             'text' => $note,
-            'author' => 'system',
             'timestamp' => new \DateTimeImmutable(),
         ];
-        
-        $this->notes[] = $noteEntry;
         $this->updatedAt = new \DateTimeImmutable();
     }
     
-    public function getNotes(): array
+    public function update(array $data): void
     {
-        return $this->notes;
-    }
-    
-    // Дополнительные бизнес-методы
-    public function getContactName(): string { return $this->contactName; }
-    public function getContactEmail(): string { return $this->contactEmail; }
-    public function getContactPhone(): ?string { return $this->contactPhone; }
-    public function getCompany(): ?string { return $this->company; }
-    
-    public function setEstimatedValue(?int $value, string $currency = 'RUB'): void
-    {
-        $this->estimatedValue = $value;
-        $this->currency = $currency;
+        if (isset($data['title'])) $this->title = $data['title'];
+        if (isset($data['contact_name'])) $this->contactName = $data['contact_name'];
+        if (isset($data['company'])) $this->company = $data['company'];
         $this->updatedAt = new \DateTimeImmutable();
-    }
-    
-    public function getEstimatedValue(): ?int { return $this->estimatedValue; }
-    public function getCurrency(): string { return $this->currency; }
-    
-    public function setCustomField(string $key, $value): void
-    {
-        $this->customFields[$key] = $value;
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-    
-    public function getCustomField(string $key)
-    {
-        return $this->customFields[$key] ?? null;
-    }
-    
-    public function getCustomFields(): array { return $this->customFields; }
-    
-    public function isQualified(): bool
-    {
-        return $this->status->getValue() === 'qualified';
-    }
-    
-    public function isConverted(): bool
-    {
-        return $this->status->getValue() === 'converted';
+        $this->addNote("Данные обновлены");
     }
 }
 
-/**
- * Сделка (коммерческое предложение)
- */
-class Deal implements DealInterface
+class Deal
 {
     private string $id;
     private string $title;
     private Money $amount;
     private string $stage;
-    private ?Lead $lead;
-    private AccessSubjectInterface $owner;
-    private int $probability; // 0-100%
+    private string $leadId;
+    private string $ownerId;
+    private int $probability;
     private ?\DateTimeInterface $closeDate;
-    private array $lineItems;
     private bool $isClosed;
     private bool $isWon;
     private ?string $closeReason;
@@ -786,31 +288,29 @@ class Deal implements DealInterface
     private \DateTimeImmutable $updatedAt;
     
     private const STAGES = [
-        'prospecting' => 'Первичный контакт',
-        'qualification' => 'Квалификация',
-        'proposal' => 'Коммерческое предложение',
-        'negotiation' => 'Переговоры',
-        'closed_won' => 'Успешно закрыта',
-        'closed_lost' => 'Закрыта неудачно',
+        'prospecting' => ['name' => 'Знакомство', 'color' => 'gray'],
+        'qualification' => ['name' => 'Квалификация', 'color' => 'blue'],
+        'proposal' => ['name' => 'Предложение', 'color' => 'yellow'],
+        'negotiation' => ['name' => 'Переговоры', 'color' => 'purple'],
+        'closed_won' => ['name' => 'Успех', 'color' => 'green'],
+        'closed_lost' => ['name' => 'Потеря', 'color' => 'red'],
     ];
     
     public function __construct(
         string $id,
         string $title,
         Money $amount,
-        AccessSubjectInterface $owner,
-        ?Lead $lead = null
+        string $ownerId,
+        string $leadId
     ) {
         $this->id = $id;
         $this->title = $title;
         $this->amount = $amount;
-        $this->owner = $owner;
-        $this->lead = $lead;
-        
+        $this->ownerId = $ownerId;
+        $this->leadId = $leadId;
         $this->stage = 'prospecting';
         $this->probability = 10;
         $this->closeDate = null;
-        $this->lineItems = [];
         $this->isClosed = false;
         $this->isWon = false;
         $this->closeReason = null;
@@ -818,97 +318,28 @@ class Deal implements DealInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
     
-    // Реализация интерфейса DealInterface
     public function getId(): string { return $this->id; }
     public function getTitle(): string { return $this->title; }
     public function getAmount(): Money { return $this->amount; }
     public function getStage(): string { return $this->stage; }
-    public function getLead(): ?LeadInterface { return $this->lead; }
-    public function getOwner(): AccessSubjectInterface { return $this->owner; }
+    public function getStageName(): string { return self::STAGES[$this->stage]['name'] ?? $this->stage; }
+    public function getStageColor(): string { return self::STAGES[$this->stage]['color'] ?? 'gray'; }
+    public function getLeadId(): string { return $this->leadId; }
+    public function getOwnerId(): string { return $this->ownerId; }
     public function getProbability(): int { return $this->probability; }
     public function getCloseDate(): ?\DateTimeInterface { return $this->closeDate; }
-    
-    public function updateStage(string $stage): void
-    {
-        if (!isset(self::STAGES[$stage])) {
-            throw new \InvalidArgumentException("Недопустимая стадия сделки: {$stage}");
-        }
-        
-        $this->stage = $stage;
-        $this->updatedAt = new \DateTimeImmutable();
-        
-        // Автоматическое обновление вероятности в зависимости от стадии
-        $this->updateProbabilityByStage($stage);
-    }
-    
-    public function updateAmount(Money $amount): void
-    {
-        $this->amount = $amount;
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-    
-    public function setProbability(int $probability): void
-    {
-        if ($probability < 0 || $probability > 100) {
-            throw new \InvalidArgumentException("Вероятность должна быть в диапазоне 0-100%");
-        }
-        
-        $this->probability = $probability;
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-    
-    public function close(bool $won, ?string $reason = null): void
-    {
-        $this->isClosed = true;
-        $this->isWon = $won;
-        $this->closeReason = $reason;
-        $this->closeDate = new \DateTimeImmutable();
-        $this->stage = $won ? 'closed_won' : 'closed_lost';
-        $this->probability = $won ? 100 : 0;
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-    
-    // Дополнительные бизнес-методы
-    public function addLineItem(string $description, int $quantity, Money $unitPrice): void
-    {
-        $lineItem = [
-            'description' => $description,
-            'quantity' => $quantity,
-            'unit_price' => $unitPrice,
-            'total' => new Money($unitPrice->getAmount() * $quantity, $unitPrice->getCurrency()),
-        ];
-        
-        $this->lineItems[] = $lineItem;
-        $this->updatedAt = new \DateTimeImmutable();
-        
-        // Пересчет общей суммы
-        $this->recalculateAmount();
-    }
-    
-    public function getLineItems(): array { return $this->lineItems; }
     public function isClosed(): bool { return $this->isClosed; }
     public function isWon(): bool { return $this->isWon; }
     public function getCloseReason(): ?string { return $this->closeReason; }
     public function getCreatedAt(): \DateTimeInterface { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeInterface { return $this->updatedAt; }
     
-    private function recalculateAmount(): void
+    public function updateStage(string $stage): void
     {
-        $totalAmount = 0;
-        $currency = 'RUB';
+        $this->stage = $stage;
+        $this->updatedAt = new \DateTimeImmutable();
         
-        foreach ($this->lineItems as $item) {
-            /** @var Money $itemTotal */
-            $itemTotal = $item['total'];
-            $totalAmount += $itemTotal->getAmount();
-            $currency = $itemTotal->getCurrency();
-        }
-        
-        $this->amount = new Money($totalAmount, $currency);
-    }
-    
-    private function updateProbabilityByStage(string $stage): void
-    {
+        // Автоматическая установка вероятности
         $probabilities = [
             'prospecting' => 10,
             'qualification' => 25,
@@ -923,54 +354,78 @@ class Deal implements DealInterface
         }
     }
     
-    public function getStageName(): string
+    public function close(bool $won, ?string $reason = null): void
     {
-        return self::STAGES[$this->stage] ?? $this->stage;
+        $this->isClosed = true;
+        $this->isWon = $won;
+        $this->closeReason = $reason;
+        $this->closeDate = new \DateTimeImmutable();
+        $this->stage = $won ? 'closed_won' : 'closed_lost';
+        $this->probability = $won ? 100 : 0;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+    
+    public function updateAmount(Money $amount): void
+    {
+        $this->amount = $amount;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 }
 
 // ==================== РЕПОЗИТОРИИ ====================
 
-/**
- * InMemory репозиторий пользователей
- */
-class InMemoryUserRepository
+class UserRepository
 {
     private array $users = [];
-    private array $index = [];
     
-    public function save(UserInterface $user): void
+    public function __construct()
     {
-        $this->users[$user->getId()] = $user;
-        $this->index['email'][$user->getEmail()->getValue()] = $user->getId();
+        // Создание тестового администратора
+        $admin = new User(
+            'user_001',
+            new Email('admin@crm.local'),
+            'Администратор',
+            'Системы',
+            password_hash('admin123', PASSWORD_DEFAULT),
+            'admin'
+        );
+        $this->save($admin);
+        
+        // Создание тестового менеджера
+        $manager = new User(
+            'user_002',
+            new Email('manager@crm.local'),
+            'Иван',
+            'Менеджеров',
+            password_hash('manager123', PASSWORD_DEFAULT),
+            'manager'
+        );
+        $this->save($manager);
     }
     
-    public function findById(string $id): ?UserInterface
+    public function findById(string $id): ?User
     {
         return $this->users[$id] ?? null;
     }
     
-    public function findByEmail(string $email): ?UserInterface
+    public function findByEmail(string $email): ?User
     {
-        $id = $this->index['email'][$email] ?? null;
-        return $id ? $this->findById($id) : null;
-    }
-    
-    public function findAll(int $limit = 100, int $offset = 0): array
-    {
-        return array_slice($this->users, $offset, $limit);
-    }
-    
-    public function delete(string $id): bool
-    {
-        if (isset($this->users[$id])) {
-            $user = $this->users[$id];
-            unset($this->index['email'][$user->getEmail()->getValue()]);
-            unset($this->users[$id]);
-            return true;
+        foreach ($this->users as $user) {
+            if ($user->getEmail()->getValue() === $email) {
+                return $user;
+            }
         }
-        
-        return false;
+        return null;
+    }
+    
+    public function save(User $user): void
+    {
+        $this->users[$user->getId()] = $user;
+    }
+    
+    public function findAll(): array
+    {
+        return array_values($this->users);
     }
     
     public function count(): int
@@ -979,199 +434,239 @@ class InMemoryUserRepository
     }
 }
 
-/**
- * InMemory репозиторий лидов
- */
-class InMemoryLeadRepository implements LeadRepositoryInterface
+class LeadRepository
 {
     private array $leads = [];
-    private array $index = [
-        'email' => [],
-        'status' => [],
-    ];
     
-    public function findById(string $id): ?LeadInterface
+    public function __construct()
+    {
+        $this->createSampleLeads();
+    }
+    
+    private function createSampleLeads(): void
+    {
+        $leads = [
+            [
+                'id' => 'lead_001',
+                'title' => 'Запрос на интеграцию CRM',
+                'contact_name' => 'Анна Петрова',
+                'contact_email' => 'anna@client.ru',
+                'contact_phone' => '79161234567',
+                'company' => 'ООО "Клиент"',
+                'source' => 'website',
+                'estimated_value' => 150000,
+                'status' => 'new',
+                'notes' => 'Клиент заинтересован в интеграции с 1С',
+                'assigned_to' => 'user_002'
+            ],
+            [
+                'id' => 'lead_002',
+                'title' => 'Консультация по настройке',
+                'contact_name' => 'Сергей Иванов',
+                'contact_email' => 'sergey@company.com',
+                'contact_phone' => '79031234567',
+                'company' => 'ИП Иванов',
+                'source' => 'email',
+                'estimated_value' => 50000,
+                'status' => 'in_progress',
+                'notes' => 'Требуется консультация по миграции данных',
+                'assigned_to' => null
+            ],
+            [
+                'id' => 'lead_003',
+                'title' => 'Разработка кастомного модуля',
+                'contact_name' => 'Мария Сидорова',
+                'contact_email' => 'maria@techcorp.ru',
+                'company' => 'ТехноКорп',
+                'source' => 'phone',
+                'estimated_value' => 300000,
+                'status' => 'qualified',
+                'notes' => 'Требуется разработка модуля аналитики',
+                'assigned_to' => 'user_002'
+            ],
+        ];
+        
+        foreach ($leads as $data) {
+            $lead = new Lead(
+                $data['id'],
+                $data['title'],
+                $data['contact_name'],
+                new Email($data['contact_email']),
+                new LeadSource($data['source']),
+                isset($data['contact_phone']) ? new Phone($data['contact_phone']) : null,
+                $data['company'] ?? null
+            );
+            
+            if (isset($data['estimated_value'])) {
+                $lead->setEstimatedValue(Money::fromFloat($data['estimated_value']));
+            }
+            
+            if (isset($data['status'])) {
+                $lead->changeStatus(new LeadStatus($data['status']));
+            }
+            
+            if (isset($data['notes'])) {
+                $lead->addNote($data['notes']);
+            }
+            
+            if (isset($data['assigned_to']) && $data['assigned_to']) {
+                $lead->assignTo($data['assigned_to']);
+            }
+            
+            $this->save($lead);
+        }
+    }
+    
+    public function findById(string $id): ?Lead
     {
         return $this->leads[$id] ?? null;
     }
     
-    public function findByEmail(string $email): array
+    public function findAll(): array
     {
-        $ids = $this->index['email'][$email] ?? [];
-        $result = [];
-        
-        foreach ($ids as $id) {
-            if ($lead = $this->findById($id)) {
-                $result[] = $lead;
-            }
-        }
-        
-        return $result;
+        return array_values($this->leads);
     }
     
     public function findByStatus(string $status): array
     {
-        $ids = $this->index['status'][$status] ?? [];
-        $result = [];
-        
-        foreach ($ids as $id) {
-            if ($lead = $this->findById($id)) {
-                $result[] = $lead;
-            }
-        }
-        
-        return $result;
+        return array_filter($this->leads, fn($lead) => $lead->getStatus()->getValue() === $status);
     }
     
-    public function save(LeadInterface $lead): void
+    public function findByAssignedTo(string $userId): array
+    {
+        return array_filter($this->leads, fn($lead) => $lead->getAssignedTo() === $userId);
+    }
+    
+    public function save(Lead $lead): void
     {
         $this->leads[$lead->getId()] = $lead;
-        
-        // Индексация по email
-        $email = $lead->getContactEmail();
-        if (!isset($this->index['email'][$email])) {
-            $this->index['email'][$email] = [];
-        }
-        if (!in_array($lead->getId(), $this->index['email'][$email], true)) {
-            $this->index['email'][$email][] = $lead->getId();
-        }
-        
-        // Индексация по статусу
-        $status = (string)$lead->getStatus();
-        if (!isset($this->index['status'][$status])) {
-            $this->index['status'][$status] = [];
-        }
-        if (!in_array($lead->getId(), $this->index['status'][$status], true)) {
-            $this->index['status'][$status][] = $lead->getId();
-        }
     }
     
-    public function delete(string $id): void
+    public function delete(string $id): bool
     {
-        if ($lead = $this->findById($id)) {
-            // Удаление из индексов
-            $email = $lead->getContactEmail();
-            if (isset($this->index['email'][$email])) {
-                $this->index['email'][$email] = array_filter(
-                    $this->index['email'][$email],
-                    fn($leadId) => $leadId !== $id
-                );
-            }
-            
-            $status = (string)$lead->getStatus();
-            if (isset($this->index['status'][$status])) {
-                $this->index['status'][$status] = array_filter(
-                    $this->index['status'][$status],
-                    fn($leadId) => $leadId !== $id
-                );
-            }
-            
-            // Удаление из основного хранилища
+        if (isset($this->leads[$id])) {
             unset($this->leads[$id]);
+            return true;
         }
+        return false;
     }
     
-    public function search(array $criteria, int $limit = 50, int $offset = 0): array
+    public function count(): int
     {
-        $results = [];
-        
-        foreach ($this->leads as $lead) {
-            if ($this->matchesCriteria($lead, $criteria)) {
-                $results[] = $lead;
-            }
-        }
-        
-        return array_slice($results, $offset, $limit);
+        return count($this->leads);
     }
     
-    public function count(array $criteria): int
+    public function countByStatus(string $status): int
     {
-        $count = 0;
-        
-        foreach ($this->leads as $lead) {
-            if ($this->matchesCriteria($lead, $criteria)) {
-                $count++;
-            }
-        }
-        
-        return $count;
+        return count($this->findByStatus($status));
+    }
+}
+
+class DealRepository
+{
+    private array $deals = [];
+    
+    public function __construct()
+    {
+        $this->createSampleDeals();
     }
     
-    private function matchesCriteria(LeadInterface $lead, array $criteria): bool
+    private function createSampleDeals(): void
     {
-        foreach ($criteria as $field => $value) {
-            switch ($field) {
-                case 'status':
-                    if ((string)$lead->getStatus() !== $value) {
-                        return false;
-                    }
-                    break;
-                    
-                case 'email':
-                    if ($lead->getContactEmail() !== $value) {
-                        return false;
-                    }
-                    break;
-                    
-                case 'assigned_to':
-                    if ($lead->getAssignedTo()?->getId() !== $value) {
-                        return false;
-                    }
-                    break;
-                    
-                case 'created_after':
-                    if ($lead->getCreatedAt() < $value) {
-                        return false;
-                    }
-                    break;
-            }
-        }
+        // Создаем тестовую сделку
+        $deal = new Deal(
+            'deal_001',
+            'Интеграция CRM для ООО "Клиент"',
+            Money::fromFloat(150000),
+            'user_002',
+            'lead_001'
+        );
+        $deal->updateStage('proposal');
+        $deal->updateAmount(Money::fromFloat(180000));
+        $this->save($deal);
         
-        return true;
+        // Еще одна сделка
+        $deal2 = new Deal(
+            'deal_002',
+            'Миграция данных для ИП Иванов',
+            Money::fromFloat(50000),
+            'user_002',
+            'lead_002'
+        );
+        $deal2->updateStage('qualification');
+        $this->save($deal2);
+    }
+    
+    public function findById(string $id): ?Deal
+    {
+        return $this->deals[$id] ?? null;
+    }
+    
+    public function findAll(): array
+    {
+        return array_values($this->deals);
+    }
+    
+    public function findByOwner(string $userId): array
+    {
+        return array_filter($this->deals, fn($deal) => $deal->getOwnerId() === $userId);
+    }
+    
+    public function findByStage(string $stage): array
+    {
+        return array_filter($this->deals, fn($deal) => $deal->getStage() === $stage);
+    }
+    
+    public function save(Deal $deal): void
+    {
+        $this->deals[$deal->getId()] = $deal;
+    }
+    
+    public function count(): int
+    {
+        return count($this->deals);
+    }
+    
+    public function countByStage(string $stage): int
+    {
+        return count($this->findByStage($stage));
+    }
+    
+    public function getTotalValue(): Money
+    {
+        $total = 0;
+        foreach ($this->deals as $deal) {
+            $total += $deal->getAmount()->getFloatAmount();
+        }
+        return Money::fromFloat($total);
     }
 }
 
 // ==================== СЕРВИСЫ ====================
 
-/**
- * Сервис аутентификации
- */
-class Authenticator implements AuthenticatorInterface
+class AuthService
 {
-    private InMemoryUserRepository $userRepository;
-    private ?AccessSubjectInterface $currentUser = null;
-    private array $sessions = [];
+    private UserRepository $userRepository;
     
-    public function __construct(InMemoryUserRepository $userRepository)
+    public function __construct(UserRepository $userRepository)
     {
         $this->userRepository = $userRepository;
     }
     
-    public function authenticate(string $login, string $password): ?AccessSubjectInterface
+    public function login(string $email, string $password): ?User
     {
-        // Поиск пользователя по email
-        $user = $this->userRepository->findByEmail($login);
+        $user = $this->userRepository->findByEmail($email);
         
-        if (!$user) {
+        if (!$user || !$user->verifyPassword($password)) {
             return null;
         }
         
-        // Проверка пароля
-        if (!$user->verifyPassword($password)) {
-            return null;
-        }
-        
-        // Проверка активности
-        if (!$user->isActive()) {
-            return null;
-        }
-        
-        $this->currentUser = $user;
-        $sessionId = bin2hex(random_bytes(16));
-        $this->sessions[$sessionId] = [
+        $_SESSION[SESSION_KEY] = [
             'user_id' => $user->getId(),
-            'created_at' => new \DateTimeImmutable(),
-            'last_activity' => new \DateTimeImmutable(),
+            'email' => $user->getEmail()->getValue(),
+            'name' => $user->getFullName(),
+            'role' => $user->getRole(),
+            'login_time' => time(),
         ];
         
         return $user;
@@ -1179,1192 +674,1520 @@ class Authenticator implements AuthenticatorInterface
     
     public function logout(): void
     {
-        $this->currentUser = null;
+        unset($_SESSION[SESSION_KEY]);
     }
     
-    public function getCurrentUser(): ?AccessSubjectInterface
+    public function getCurrentUser(): ?array
     {
-        return $this->currentUser;
+        return $_SESSION[SESSION_KEY] ?? null;
     }
     
-    public function validateSession(string $sessionId): bool
+    public function isLoggedIn(): bool
     {
-        if (!isset($this->sessions[$sessionId])) {
-            return false;
+        return isset($_SESSION[SESSION_KEY]);
+    }
+    
+    public function requireAuth(): void
+    {
+        if (!$this->isLoggedIn()) {
+            header('Location: ?page=login');
+            exit;
         }
+    }
+    
+    public function requireRole(string $role): void
+    {
+        $this->requireAuth();
         
-        $session = $this->sessions[$sessionId];
-        $now = new \DateTimeImmutable();
-        $inactivityLimit = new \DateInterval('PT30M'); // 30 минут
-        
-        if ($now->diff($session['last_activity']) > $inactivityLimit) {
-            unset($this->sessions[$sessionId]);
-            return false;
+        $user = $this->getCurrentUser();
+        if ($user['role'] !== $role) {
+            header('Location: ?page=dashboard');
+            exit;
         }
-        
-        // Обновляем время последней активности
-        $this->sessions[$sessionId]['last_activity'] = $now;
-        
-        // Устанавливаем текущего пользователя
-        $user = $this->userRepository->findById($session['user_id']);
-        if ($user instanceof AccessSubjectInterface) {
-            $this->currentUser = $user;
-            return true;
-        }
-        
-        return false;
     }
 }
 
-/**
- * Менеджер разрешений
- */
-class PermissionManager implements PermissionManagerInterface
+class LeadService
 {
-    private array $rolePermissions = [];
-    private array $userPermissions = [];
+    private LeadRepository $leadRepository;
+    private UserRepository $userRepository;
     
-    public function __construct()
+    public function __construct(LeadRepository $leadRepository, UserRepository $userRepository)
     {
-        // Инициализация стандартных ролей
-        $this->rolePermissions = [
-            'admin' => ['*'],
-            'manager' => [
-                'lead.create', 'lead.read', 'lead.update', 'lead.delete',
-                'deal.create', 'deal.read', 'deal.update',
-                'contact.read', 'contact.update',
-            ],
-            'user' => [
-                'lead.read', 'lead.update.own',
-                'deal.read.own', 'deal.update.own',
-                'contact.read',
-            ],
-            'guest' => ['lead.read.public'],
+        $this->leadRepository = $leadRepository;
+        $this->userRepository = $userRepository;
+    }
+    
+    public function createLead(array $data): Lead
+    {
+        $leadId = 'lead_' . uniqid();
+        
+        try {
+            $lead = new Lead(
+                $leadId,
+                $data['title'] ?? 'Новый лид',
+                $data['contact_name'],
+                new Email($data['contact_email']),
+                new LeadSource($data['source'] ?? 'website'),
+                isset($data['contact_phone']) ? new Phone($data['contact_phone']) : null,
+                $data['company'] ?? null
+            );
+            
+            if (isset($data['estimated_value']) && $data['estimated_value'] > 0) {
+                $lead->setEstimatedValue(Money::fromFloat((float)$data['estimated_value']));
+            }
+            
+            if (isset($data['assigned_to'])) {
+                $lead->assignTo($data['assigned_to']);
+            }
+            
+            $lead->addNote($data['notes'] ?? 'Лид создан через веб-интерфейс');
+            
+            $this->leadRepository->save($lead);
+            return $lead;
+            
+        } catch (\Exception $e) {
+            throw new \RuntimeException("Ошибка создания лида: " . $e->getMessage());
+        }
+    }
+    
+    public function updateLead(string $id, array $data): ?Lead
+    {
+        $lead = $this->leadRepository->findById($id);
+        
+        if (!$lead) {
+            return null;
+        }
+        
+        $lead->update($data);
+        
+        if (isset($data['status'])) {
+            $lead->changeStatus(new LeadStatus($data['status']));
+        }
+        
+        if (isset($data['estimated_value'])) {
+            $value = $data['estimated_value'] ? Money::fromFloat((float)$data['estimated_value']) : null;
+            $lead->setEstimatedValue($value);
+        }
+        
+        if (isset($data['assigned_to'])) {
+            $lead->assignTo($data['assigned_to']);
+        }
+        
+        if (isset($data['notes']) && $data['notes']) {
+            $lead->addNote($data['notes']);
+        }
+        
+        $this->leadRepository->save($lead);
+        return $lead;
+    }
+    
+    public function deleteLead(string $id): bool
+    {
+        return $this->leadRepository->delete($id);
+    }
+    
+    public function getLeadStats(): array
+    {
+        return [
+            'total' => $this->leadRepository->count(),
+            'new' => $this->leadRepository->countByStatus('new'),
+            'in_progress' => $this->leadRepository->countByStatus('in_progress'),
+            'qualified' => $this->leadRepository->countByStatus('qualified'),
+            'converted' => $this->leadRepository->countByStatus('converted'),
+            'disqualified' => $this->leadRepository->countByStatus('disqualified'),
         ];
     }
     
-    public function isGranted(AccessSubjectInterface $user, string $permission, ?object $subject = null): bool
+    public function getAllLeads(): array
     {
-        // Проверка пользовательских разрешений
-        if ($user->hasPermission('*')) {
-            return true;
-        }
-        
-        if ($user->hasPermission($permission)) {
-            return true;
-        }
-        
-        // Проверка ролевых разрешений
-        foreach ($user->getRoles() as $role) {
-            if ($this->hasRolePermission($role, $permission)) {
-                return true;
-            }
-        }
-        
-        // Проверка предметно-ориентированных разрешений
-        if ($subject !== null) {
-            $objectPermission = $permission . '.' . $this->getObjectType($subject);
-            if ($user->hasPermission($objectPermission)) {
-                return true;
-            }
-            
-            // Проверка владения объектом
-            if (str_ends_with($permission, '.own')) {
-                if ($this->isOwner($user, $subject)) {
-                    return true;
-                }
-            }
-        }
-        
-        return false;
-    }
-    
-    public function grantRole(string $role, array $permissions): void
-    {
-        $this->rolePermissions[$role] = $permissions;
-    }
-    
-    public function revokeRole(string $role): void
-    {
-        unset($this->rolePermissions[$role]);
-    }
-    
-    private function hasRolePermission(string $role, string $permission): bool
-    {
-        if (!isset($this->rolePermissions[$role])) {
-            return false;
-        }
-        
-        $rolePerms = $this->rolePermissions[$role];
-        
-        if (in_array('*', $rolePerms, true)) {
-            return true;
-        }
-        
-        return in_array($permission, $rolePerms, true);
-    }
-    
-    private function getObjectType(object $subject): string
-    {
-        $className = get_class($subject);
-        $parts = explode('\\', $className);
-        $shortName = end($parts);
-        
-        return strtolower($shortName);
-    }
-    
-    private function isOwner(AccessSubjectInterface $user, object $subject): bool
-    {
-        if (method_exists($subject, 'getOwner')) {
-            $owner = $subject->getOwner();
-            return $owner->getId() === $user->getId();
-        }
-        
-        if (method_exists($subject, 'getAssignedTo')) {
-            $assignedTo = $subject->getAssignedTo();
-            return $assignedTo && $assignedTo->getId() === $user->getId();
-        }
-        
-        return false;
+        return $this->leadRepository->findAll();
     }
 }
 
-/**
- * Сервис конвертации лидов
- */
-class LeadConverter implements LeadConverterInterface
+class DealService
 {
-    private InMemoryLeadRepository $leadRepository;
-    private array $dealRepository;
+    private DealRepository $dealRepository;
+    private LeadRepository $leadRepository;
     
-    public function __construct(InMemoryLeadRepository $leadRepository)
+    public function __construct(DealRepository $dealRepository, LeadRepository $leadRepository)
     {
+        $this->dealRepository = $dealRepository;
         $this->leadRepository = $leadRepository;
-        $this->dealRepository = [];
     }
     
-    public function convert(LeadInterface $lead, array $options = []): DealInterface
+    public function createDeal(array $data): Deal
     {
-        if (!$this->canConvert($lead)) {
-            throw new \DomainException("Лид не может быть конвертирован. Текущий статус: " . $lead->getStatus());
-        }
-        
-        // Создание сделки на основе лида
-        $dealId = uniqid('deal_', true);
-        $amount = $lead->getEstimatedValue() 
-            ? new Money($lead->getEstimatedValue(), $lead->getCurrency())
-            : new Money(0, 'RUB');
+        $dealId = 'deal_' . uniqid();
         
         $deal = new Deal(
             $dealId,
-            "Сделка по лиду: " . $lead->getTitle(),
-            $amount,
-            $lead->getAssignedTo() ?? throw new \RuntimeException("Лид не назначен"),
-            $lead
+            $data['title'] ?? 'Новая сделка',
+            Money::fromFloat((float)($data['amount'] ?? 0)),
+            $data['owner_id'],
+            $data['lead_id']
         );
         
-        // Обновление статуса лида
+        if (isset($data['stage'])) {
+            $deal->updateStage($data['stage']);
+        }
+        
+        $this->dealRepository->save($deal);
+        return $deal;
+    }
+    
+    public function convertLeadToDeal(string $leadId, string $ownerId): ?Deal
+    {
+        $lead = $this->leadRepository->findById($leadId);
+        
+        if (!$lead || $lead->getStatus()->getValue() !== 'qualified') {
+            return null;
+        }
+        
+        $deal = new Deal(
+            'deal_' . uniqid(),
+            'Сделка по лиду: ' . $lead->getTitle(),
+            $lead->getEstimatedValue() ?? Money::fromFloat(0),
+            $ownerId,
+            $leadId
+        );
+        
         $lead->changeStatus(new LeadStatus('converted'));
         $this->leadRepository->save($lead);
-        
-        // Сохранение сделки
-        $this->dealRepository[$dealId] = $deal;
+        $this->dealRepository->save($deal);
         
         return $deal;
     }
     
-    public function canConvert(LeadInterface $lead): bool
+    public function getDealStats(): array
     {
-        return $lead->getStatus()->getValue() === 'qualified' && $lead->getAssignedTo() !== null;
-    }
-    
-    public function getDeal(string $id): ?Deal
-    {
-        return $this->dealRepository[$id] ?? null;
-    }
-    
-    public function getDealsByLead(string $leadId): array
-    {
-        $deals = [];
-        
-        foreach ($this->dealRepository as $deal) {
-            if ($deal->getLead() && $deal->getLead()->getId() === $leadId) {
-                $deals[] = $deal;
-            }
-        }
-        
-        return $deals;
-    }
-}
-
-/**
- * Простая реализация шины сообщений
- */
-class SimpleMessageBus implements MessageBusInterface
-{
-    private array $handlers = [];
-    private array $eventListeners = [];
-    private bool $isDispatching = false;
-    private array $queue = [];
-    
-    public function dispatch(object $message): void
-    {
-        $this->queue[] = $message;
-        
-        if (!$this->isDispatching) {
-            $this->isDispatching = true;
-            
-            while ($message = array_shift($this->queue)) {
-                $this->handleMessage($message);
-            }
-            
-            $this->isDispatching = false;
-        }
-    }
-    
-    public function subscribe(string $eventClass, callable $handler): void
-    {
-        if (!isset($this->eventListeners[$eventClass])) {
-            $this->eventListeners[$eventClass] = [];
-        }
-        
-        $this->eventListeners[$eventClass][] = $handler;
-    }
-    
-    public function publish(object $event): void
-    {
-        $eventClass = get_class($event);
-        
-        if (isset($this->eventListeners[$eventClass])) {
-            foreach ($this->eventListeners[$eventClass] as $handler) {
-                try {
-                    $handler($event);
-                } catch (\Throwable $e) {
-                    // Логируем ошибку, но не прерываем выполнение
-                    error_log("Ошибка в обработчике события {$eventClass}: " . $e->getMessage());
-                }
-            }
-        }
-    }
-    
-    private function handleMessage(object $message): void
-    {
-        $messageClass = get_class($message);
-        
-        if (isset($this->handlers[$messageClass])) {
-            foreach ($this->handlers[$messageClass] as $handler) {
-                $handler($message);
-            }
-        }
-        
-        // Также публикуем как событие
-        $this->publish($message);
-    }
-    
-    public function registerHandler(string $messageClass, callable $handler): void
-    {
-        if (!isset($this->handlers[$messageClass])) {
-            $this->handlers[$messageClass] = [];
-        }
-        
-        $this->handlers[$messageClass][] = $handler;
-    }
-}
-
-/**
- * Локальное файловое хранилище
- */
-class LocalStorage implements StorageInterface
-{
-    private string $basePath;
-    
-    public function __construct(string $basePath)
-    {
-        $this->basePath = rtrim($basePath, '/') . '/';
-        
-        if (!is_dir($this->basePath)) {
-            mkdir($this->basePath, 0777, true);
-        }
-    }
-    
-    public function put(string $path, string $content, array $metadata = []): string
-    {
-        $fullPath = $this->basePath . ltrim($path, '/');
-        $dir = dirname($fullPath);
-        
-        if (!is_dir($dir)) {
-            mkdir($dir, 0777, true);
-        }
-        
-        file_put_contents($fullPath, $content);
-        
-        // Сохраняем метаданные
-        if (!empty($metadata)) {
-            $metaFile = $fullPath . '.meta';
-            file_put_contents($metaFile, json_encode($metadata, JSON_PRETTY_PRINT));
-        }
-        
-        return $path;
-    }
-    
-    public function get(string $path): string
-    {
-        $fullPath = $this->basePath . ltrim($path, '/');
-        
-        if (!file_exists($fullPath)) {
-            throw new \RuntimeException("Файл не найден: {$path}");
-        }
-        
-        return file_get_contents($fullPath);
-    }
-    
-    public function delete(string $path): bool
-    {
-        $fullPath = $this->basePath . ltrim($path, '/');
-        
-        if (file_exists($fullPath)) {
-            unlink($fullPath);
-            
-            // Удаляем метаданные если есть
-            $metaFile = $fullPath . '.meta';
-            if (file_exists($metaFile)) {
-                unlink($metaFile);
-            }
-            
-            return true;
-        }
-        
-        return false;
-    }
-    
-    public function exists(string $path): bool
-    {
-        $fullPath = $this->basePath . ltrim($path, '/');
-        return file_exists($fullPath);
-    }
-    
-    public function getUrl(string $path): string
-    {
-        return '/storage/' . ltrim($path, '/');
-    }
-}
-
-/**
- * Простой аудитор в файл
- */
-class FileAuditor implements AuditorInterface
-{
-    private string $logFile;
-    private LocalStorage $storage;
-    
-    public function __construct(LocalStorage $storage, string $logPath = 'audit.log')
-    {
-        $this->storage = $storage;
-        $this->logFile = $logPath;
-    }
-    
-    public function log(string $action, array $data, ?string $userId = null): void
-    {
-        $entry = [
-            'timestamp' => date('Y-m-d H:i:s'),
-            'action' => $action,
-            'user_id' => $userId,
-            'data' => $data,
-            'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
-        ];
-        
-        $logLine = json_encode($entry, JSON_UNESCAPED_UNICODE) . PHP_EOL;
-        
-        try {
-            $this->storage->put(
-                $this->logFile,
-                $logLine,
-                ['append' => true]
-            );
-        } catch (\Throwable $e) {
-            error_log("Не удалось записать в аудит-лог: " . $e->getMessage());
-        }
-    }
-    
-    public function getLogs(array $criteria = [], int $limit = 100): array
-    {
-        try {
-            $content = $this->storage->get($this->logFile);
-            $lines = explode(PHP_EOL, $content);
-            
-            $logs = [];
-            foreach ($lines as $line) {
-                if (empty(trim($line))) {
-                    continue;
-                }
-                
-                $log = json_decode($line, true);
-                if ($this->matchesCriteria($log, $criteria)) {
-                    $logs[] = $log;
-                }
-                
-                if (count($logs) >= $limit) {
-                    break;
-                }
-            }
-            
-            return $logs;
-        } catch (\Throwable $e) {
-            return [];
-        }
-    }
-    
-    public function getUserActivity(string $userId, \DateTimeInterface $from, \DateTimeInterface $to): array
-    {
-        $criteria = [
-            'user_id' => $userId,
-            'timestamp_from' => $from->format('Y-m-d H:i:s'),
-            'timestamp_to' => $to->format('Y-m-d H:i:s'),
-        ];
-        
-        return $this->getLogs($criteria, 1000);
-    }
-    
-    private function matchesCriteria(array $log, array $criteria): bool
-    {
-        foreach ($criteria as $key => $value) {
-            switch ($key) {
-                case 'user_id':
-                    if ($log['user_id'] !== $value) {
-                        return false;
-                    }
-                    break;
-                    
-                case 'action':
-                    if ($log['action'] !== $value) {
-                        return false;
-                    }
-                    break;
-                    
-                case 'timestamp_from':
-                    if ($log['timestamp'] < $value) {
-                        return false;
-                    }
-                    break;
-                    
-                case 'timestamp_to':
-                    if ($log['timestamp'] > $value) {
-                        return false;
-                    }
-                    break;
-            }
-        }
-        
-        return true;
-    }
-}
-
-// ==================== DI КОНТЕЙНЕР ====================
-
-/**
- * Простой DI контейнер
- */
-class Container
-{
-    private array $services = [];
-    private array $factories = [];
-    private array $instances = [];
-    
-    public function set(string $id, object $service): void
-    {
-        $this->instances[$id] = $service;
-    }
-    
-    public function get(string $id): object
-    {
-        if (isset($this->instances[$id])) {
-            return $this->instances[$id];
-        }
-        
-        if (isset($this->factories[$id])) {
-            $service = $this->factories[$id]($this);
-            $this->instances[$id] = $service;
-            return $service;
-        }
-        
-        if (isset($this->services[$id])) {
-            $class = $this->services[$id];
-            $service = new $class();
-            $this->instances[$id] = $service;
-            return $service;
-        }
-        
-        throw new \RuntimeException("Сервис {$id} не зарегистрирован");
-    }
-    
-    public function register(string $id, string $className): void
-    {
-        $this->services[$id] = $className;
-    }
-    
-    public function factory(string $id, callable $factory): void
-    {
-        $this->factories[$id] = $factory;
-    }
-    
-    public function has(string $id): bool
-    {
-        return isset($this->instances[$id]) 
-            || isset($this->factories[$id]) 
-            || isset($this->services[$id]);
-    }
-}
-
-// ==================== ПРИЛОЖЕНИЕ ====================
-
-/**
- * Главный класс приложения
- */
-class Application
-{
-    private static ?self $instance = null;
-    private array $modules = [];
-    private array $services = [];
-    private Container $container;
-    
-    private function __construct()
-    {
-        $this->container = new Container();
-        $this->init();
-    }
-    
-    public static function getInstance(): self
-    {
-        if (self::$instance === null) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
-    
-    /**
-     * Инициализация системы
-     */
-    private function init(): void
-    {
-        // Регистрация сервисов в контейнере
-        $this->container->factory('storage', function() {
-            return new LocalStorage(__DIR__ . '/storage');
-        });
-        
-        $this->container->factory('message_bus', function() {
-            return new SimpleMessageBus();
-        });
-        
-        $this->container->factory('auditor', function(Container $c) {
-            return new FileAuditor($c->get('storage'));
-        });
-        
-        $this->container->factory('user_repository', function() {
-            return new InMemoryUserRepository();
-        });
-        
-        $this->container->factory('lead_repository', function() {
-            return new InMemoryLeadRepository();
-        });
-        
-        $this->container->factory('authenticator', function(Container $c) {
-            return new Authenticator($c->get('user_repository'));
-        });
-        
-        $this->container->factory('permission_manager', function() {
-            return new PermissionManager();
-        });
-        
-        $this->container->factory('lead_converter', function(Container $c) {
-            return new LeadConverter($c->get('lead_repository'));
-        });
-        
-        // Инициализация модулей
-        $this->initModules();
-    }
-    
-    /**
-     * Инициализация модулей системы
-     */
-    private function initModules(): void
-    {
-        // Инициализация IAM модуля
-        $iamModule = new class($this->container) {
-            private Container $container;
-            
-            public function __construct(Container $container)
-            {
-                $this->container = $container;
-            }
-            
-            public function getName(): string
-            {
-                return 'IAM Module';
-            }
-            
-            public function init(): void
-            {
-                // Инициализация модуля
-                $userRepo = $this->container->get('user_repository');
-                
-                // Создание тестового администратора
-                $adminEmail = new Email('admin@crm.local');
-                $adminPassword = password_hash('admin123', PASSWORD_DEFAULT);
-                
-                $admin = new User(
-                    'admin_001',
-                    $adminEmail,
-                    'Admin',
-                    'System',
-                    $adminPassword,
-                    ['admin'],
-                    ['*']
-                );
-                
-                $userRepo->save($admin);
-                
-                // Создание тестового менеджера
-                $managerEmail = new Email('manager@crm.local');
-                $managerPassword = password_hash('manager123', PASSWORD_DEFAULT);
-                
-                $manager = new User(
-                    'manager_001',
-                    $managerEmail,
-                    'Иван',
-                    'Менеджеров',
-                    $managerPassword,
-                    ['manager']
-                );
-                
-                $userRepo->save($manager);
-            }
-        };
-        
-        $iamModule->init();
-        $this->registerModule('iam', $iamModule);
-        
-        // Инициализация Sales модуля
-        $salesModule = new class($this->container) {
-            private Container $container;
-            
-            public function __construct(Container $container)
-            {
-                $this->container = $container;
-            }
-            
-            public function getName(): string
-            {
-                return 'Sales Module';
-            }
-            
-            public function init(): void
-            {
-                // Создание тестовых лидов
-                $leadRepo = $this->container->get('lead_repository');
-                $userRepo = $this->container->get('user_repository');
-                
-                $manager = $userRepo->findByEmail('manager@crm.local');
-                
-                // Лид 1
-                $lead1 = new Lead(
-                    'lead_001',
-                    'Запрос на интеграцию CRM',
-                    'Анна Петрова',
-                    'anna@client.ru',
-                    new LeadSource('google', 'cpc', 'crm_integration'),
-                    '+79161234567',
-                    'ООО "Клиент"'
-                );
-                
-                $lead1->setEstimatedValue(150000);
-                $lead1->assignTo($manager);
-                $lead1->addNote('Клиент заинтересован в интеграции с 1С');
-                
-                $leadRepo->save($lead1);
-                
-                // Лид 2
-                $lead2 = new Lead(
-                    'lead_002',
-                    'Консультация по настройке',
-                    'Сергей Иванов',
-                    'sergey@company.com',
-                    new LeadSource('direct', 'email'),
-                    '+79031234567',
-                    'ИП Иванов'
-                );
-                
-                $lead2->setEstimatedValue(50000);
-                $lead2->addNote('Требуется консультация по миграции данных');
-                
-                $leadRepo->save($lead2);
-            }
-        };
-        
-        $salesModule->init();
-        $this->registerModule('sales', $salesModule);
-        
-        // Регистрация сервисов в приложении
-        $this->services = [
-            'authenticator' => $this->container->get('authenticator'),
-            'permission_manager' => $this->container->get('permission_manager'),
-            'lead_converter' => $this->container->get('lead_converter'),
-            'message_bus' => $this->container->get('message_bus'),
-            'auditor' => $this->container->get('auditor'),
+        return [
+            'total' => $this->dealRepository->count(),
+            'total_value' => $this->dealRepository->getTotalValue(),
+            'prospecting' => $this->dealRepository->countByStage('prospecting'),
+            'qualification' => $this->dealRepository->countByStage('qualification'),
+            'proposal' => $this->dealRepository->countByStage('proposal'),
+            'negotiation' => $this->dealRepository->countByStage('negotiation'),
+            'closed_won' => $this->dealRepository->countByStage('closed_won'),
+            'closed_lost' => $this->dealRepository->countByStage('closed_lost'),
         ];
     }
     
-    /**
-     * Запуск приложения
-     */
-    public function run(): void
+    public function getAllDeals(): array
     {
-        if (CRM_DEBUG) {
-            error_reporting(E_ALL);
-            ini_set('display_errors', '1');
-        }
-        
-        echo "CRM System v" . APP_VERSION . " запущена\n";
-        echo "Режим: " . (CRM_DEBUG ? 'Разработка' : 'Продакшен') . "\n";
-        
-        // Основной цикл
-        $this->dispatch();
-    }
-    
-    /**
-     * Обработка запросов
-     */
-    private function dispatch(): void
-    {
-        echo "Система готова к работе\n";
-        
-        // Тестовый вывод доступных модулей
-        if (!empty($this->modules)) {
-            echo "Загруженные модули: " . implode(', ', array_keys($this->modules)) . "\n";
-        }
-    }
-    
-    /**
-     * Регистрация модуля
-     */
-    public function registerModule(string $name, object $module): void
-    {
-        $this->modules[$name] = $module;
-    }
-    
-    /**
-     * Получить сервис по имени
-     */
-    public function getService(string $name): ?object
-    {
-        return $this->services[$name] ?? null;
+        return $this->dealRepository->findAll();
     }
 }
 
-// ==================== CLI КОМАНДЫ ====================
+// ==================== ИНИЦИАЛИЗАЦИЯ СЕРВИСОВ ====================
 
-/**
- * Базовый класс CLI команды
- */
-abstract class Command
-{
-    abstract public function getName(): string;
-    abstract public function getDescription(): string;
-    abstract public function execute(array $args): void;
-    
-    protected function writeLine(string $message): void
-    {
-        echo $message . PHP_EOL;
-    }
-    
-    protected function writeError(string $message): void
-    {
-        echo "ОШИБКА: " . $message . PHP_EOL;
-    }
-    
-    protected function writeSuccess(string $message): void
-    {
-        echo "✓ " . $message . PHP_EOL;
-    }
-    
-    protected function writeTable(array $headers, array $rows): void
-    {
-        echo implode("\t", $headers) . PHP_EOL;
-        echo str_repeat("-", count($headers) * 20) . PHP_EOL;
-        
-        foreach ($rows as $row) {
-            echo implode("\t", $row) . PHP_EOL;
-        }
-    }
-}
+$userRepository = new UserRepository();
+$leadRepository = new LeadRepository();
+$dealRepository = new DealRepository();
 
-/**
- * Менеджер CLI команд
- */
-class CommandManager
-{
-    private array $commands = [];
-    private Application $app;
-    
-    public function __construct(Application $app)
-    {
-        $this->app = $app;
-        $this->registerDefaultCommands();
-    }
-    
-    public function register(Command $command): void
-    {
-        $this->commands[$command->getName()] = $command;
-    }
-    
-    public function execute(string $commandName, array $args = []): void
-    {
-        if (!isset($this->commands[$commandName])) {
-            echo "Неизвестная команда: {$commandName}" . PHP_EOL;
-            $this->showHelp();
-            return;
-        }
-        
-        try {
-            $this->commands[$commandName]->execute($args);
-        } catch (\Throwable $e) {
-            echo "Ошибка выполнения команды: " . $e->getMessage() . PHP_EOL;
-            if (CRM_DEBUG) {
-                echo "Трассировка: " . $e->getTraceAsString() . PHP_EOL;
-            }
-        }
-    }
-    
-    public function showHelp(): void
-    {
-        echo "Доступные команды:" . PHP_EOL;
-        echo str_repeat("=", 50) . PHP_EOL;
-        
-        foreach ($this->commands as $command) {
-            printf("  %-20s %s\n", $command->getName(), $command->getDescription());
-        }
-    }
-    
-    private function registerDefaultCommands(): void
-    {
-        $this->register(new class($this->app) extends Command {
-            private Application $app;
-            
-            public function __construct(Application $app)
-            {
-                $this->app = $app;
-            }
-            
-            public function getName(): string { return 'help'; }
-            public function getDescription(): string { return 'Показать справку по командам'; }
-            
-            public function execute(array $args): void
-            {
-                // Help реализуется в CommandManager
-            }
-        });
-        
-        $this->register(new class($this->app) extends Command {
-            private Application $app;
-            
-            public function __construct(Application $app)
-            {
-                $this->app = $app;
-            }
-            
-            public function getName(): string { return 'version'; }
-            public function getDescription(): string { return 'Показать версию CRM'; }
-            
-            public function execute(array $args): void
-            {
-                $this->writeLine("CRM System v" . APP_VERSION);
-                $this->writeLine("Режим: " . (CRM_DEBUG ? 'Разработка' : 'Продакшен'));
-            }
-        });
-        
-        $this->register(new class($this->app) extends Command {
-            private Application $app;
-            
-            public function __construct(Application $app)
-            {
-                $this->app = $app;
-            }
-            
-            public function getName(): string { return 'user:list'; }
-            public function getDescription(): string { return 'Список пользователей'; }
-            
-            public function execute(array $args): void
-            {
-                $this->writeLine("Список пользователей:");
-                $this->writeLine("1. admin@crm.local (Администратор)");
-                $this->writeLine("2. manager@crm.local (Менеджер)");
-            }
-        });
-        
-        $this->register(new class($this->app) extends Command {
-            private Application $app;
-            
-            public function __construct(Application $app)
-            {
-                $this->app = $app;
-            }
-            
-            public function getName(): string { return 'lead:list'; }
-            public function getDescription(): string { return 'Список лидов'; }
-            
-            public function execute(array $args): void
-            {
-                $this->writeLine("Список лидов:");
-                $this->writeLine("=" . str_repeat("=", 60));
-                
-                $headers = ['ID', 'Название', 'Клиент', 'Статус', 'Ответственный', 'Бюджет'];
-                $rows = [
-                    ['lead_001', 'Запрос на интеграцию CRM', 'Анна Петрова', 'Новый', 'Иван Менеджеров', '150 000 ₽'],
-                    ['lead_002', 'Консультация по настройке', 'Сергей Иванов', 'Новый', 'Не назначен', '50 000 ₽'],
-                ];
-                
-                $this->writeTable($headers, $rows);
-            }
-        });
-        
-        $this->register(new class($this->app) extends Command {
-            private Application $app;
-            
-            public function __construct(Application $app)
-            {
-                $this->app = $app;
-            }
-            
-            public function getName(): string { return 'demo'; }
-            public function getDescription(): string { return 'Демонстрация работы CRM'; }
-            
-            public function execute(array $args): void
-            {
-                $this->writeLine("=== ДЕМОНСТРАЦИЯ CRM СИСТЕМЫ ===");
-                $this->writeLine("");
-                
-                // 1. Аутентификация
-                $this->writeLine("1. Аутентификация пользователя:");
-                
-                /** @var Authenticator $auth */
-                $auth = $this->app->getService('authenticator');
-                $user = $auth->authenticate('manager@crm.local', 'manager123');
-                
-                if ($user) {
-                    $this->writeSuccess("Аутентификация успешна: " . $user->getFullName());
-                } else {
-                    $this->writeError("Ошибка аутентификации");
-                    return;
-                }
-                
-                // 2. Проверка прав
-                $this->writeLine("");
-                $this->writeLine("2. Проверка прав доступа:");
-                
-                /** @var PermissionManager $perms */
-                $perms = $this->app->getService('permission_manager');
-                
-                $permissions = [
-                    'lead.create' => 'Создание лидов',
-                    'lead.delete' => 'Удаление лидов',
-                    'user.create' => 'Создание пользователей',
-                ];
-                
-                foreach ($permissions as $permission => $description) {
-                    $has = $perms->isGranted($user, $permission);
-                    $status = $has ? '✓' : '✗';
-                    $this->writeLine("  {$status} {$description}: " . ($has ? 'ДОСТУПНО' : 'ЗАПРЕЩЕНО'));
-                }
-                
-                // 3. Работа с лидами
-                $this->writeLine("");
-                $this->writeLine("3. Работа с лидами:");
-                
-                $leadRepo = new InMemoryLeadRepository();
-                $userRepo = new InMemoryUserRepository();
-                
-                // Получение лидов по статусу
-                $newLeads = $leadRepo->findByStatus('new');
-                $this->writeSuccess("Найдено лидов со статусом 'Новый': " . count($newLeads));
-                
-                // Поиск по email
-                $leadsByEmail = $leadRepo->findByEmail('anna@client.ru');
-                $this->writeSuccess("Найдено лидов по email anna@client.ru: " . count($leadsByEmail));
-                
-                // 4. Конвертация лида
-                $this->writeLine("");
-                $this->writeLine("4. Конвертация лида в сделку:");
-                
-                if (!empty($newLeads)) {
-                    $lead = $newLeads[0];
-                    
-                    // Изменение статуса на qualified
-                    $lead->changeStatus(new LeadStatus('qualified'));
-                    $leadRepo->save($lead);
-                    
-                    // Конвертация
-                    /** @var LeadConverter $converter */
-                    $converter = $this->app->getService('lead_converter');
-                    
-                    if ($converter->canConvert($lead)) {
-                        $deal = $converter->convert($lead);
-                        $this->writeSuccess("Лид успешно конвертирован в сделку:");
-                        $this->writeLine("  ID сделки: " . $deal->getId());
-                        $this->writeLine("  Сумма: " . $deal->getAmount());
-                        $this->writeLine("  Стадия: " . $deal->getStageName());
-                    } else {
-                        $this->writeError("Лид не может быть конвертирован");
-                    }
-                }
-                
-                // 5. Аудит действий
-                $this->writeLine("");
-                $this->writeLine("5. Аудит действий пользователя:");
-                
-                /** @var FileAuditor $auditor */
-                $auditor = $this->app->getService('auditor');
-                
-                // Логируем действия
-                $auditor->log('lead.converted', [
-                    'lead_id' => 'lead_001',
-                    'deal_id' => 'deal_001',
-                    'amount' => 150000,
-                ], $user->getId());
-                
-                $this->writeSuccess("Действие залогировано в системе аудита");
-                
-                $this->writeLine("");
-                $this->writeLine("=== ДЕМОНСТРАЦИЯ ЗАВЕРШЕНА ===");
-                $this->writeLine("Система успешно продемонстрировала работу всех основных модулей:");
-                $this->writeLine("✓ IAM (Аутентификация и права доступа)");
-                $this->writeLine("✓ Sales (Управление лидами и сделками)");
-                $this->writeLine("✓ Infrastructure (Шина сообщений, хранилище, аудит)");
-                $this->writeLine("");
-                $this->writeLine("Общая архитектура: Clean Architecture + DDD + Hexagonal");
-            }
-        });
-    }
-}
+$authService = new AuthService($userRepository);
+$leadService = new LeadService($leadRepository, $userRepository);
+$dealService = new DealService($dealRepository, $leadRepository);
 
-// ==================== ТОЧКА ВХОДА ====================
+// ==================== ОБРАБОТКА ЗАПРОСОВ ====================
 
-/**
- * Точка входа в приложение
- */
-function main(array $argv): void
-{
-    // Создаем приложение
-    $app = Application::getInstance();
+$action = $_GET['action'] ?? null;
+$page = $_GET['page'] ?? 'dashboard';
+
+// Обработка POST запросов
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $currentUser = $authService->getCurrentUser();
     
-    // Создаем менеджер команд
-    $commandManager = new CommandManager($app);
-    
-    // Обработка аргументов командной строки
-    if (count($argv) < 2) {
-        // Запуск в интерактивном режиме
-        echo "CRM System Interactive Mode" . PHP_EOL;
-        echo "Type 'help' for commands, 'exit' to quit" . PHP_EOL . PHP_EOL;
-        
-        while (true) {
-            echo "crm> ";
-            $input = trim(fgets(STDIN));
-            
-            if ($input === 'exit' || $input === 'quit') {
-                break;
-            }
-            
-            if (empty($input)) {
-                continue;
-            }
-            
-            $parts = explode(' ', $input);
-            $command = $parts[0];
-            $args = array_slice($parts, 1);
-            
-            if ($command === 'help') {
-                $commandManager->showHelp();
+    switch ($_POST['_action'] ?? '') {
+        case 'login':
+            $user = $authService->login($_POST['email'], $_POST['password']);
+            if ($user) {
+                header('Location: ?page=dashboard');
+                exit;
             } else {
-                $commandManager->execute($command, $args);
+                $error = 'Неверный email или пароль';
             }
+            break;
             
-            echo PHP_EOL;
-        }
-    } else {
-        // Запуск конкретной команды
-        $command = $argv[1];
-        $args = array_slice($argv, 2);
-        
-        if ($command === 'help') {
-            $commandManager->showHelp();
-        } else {
-            $commandManager->execute($command, $args);
-        }
+        case 'logout':
+            $authService->logout();
+            header('Location: ?page=login');
+            exit;
+            
+        case 'create_lead':
+            $authService->requireAuth();
+            try {
+                $data = $_POST;
+                $data['assigned_to'] = $currentUser['user_id'];
+                $leadService->createLead($data);
+                header('Location: ?page=leads');
+                exit;
+            } catch (\Exception $e) {
+                $error = $e->getMessage();
+            }
+            break;
+            
+        case 'update_lead':
+            $authService->requireAuth();
+            $leadService->updateLead($_POST['id'], $_POST);
+            header('Location: ?page=lead&id=' . $_POST['id']);
+            exit;
+            
+        case 'delete_lead':
+            $authService->requireAuth();
+            $leadService->deleteLead($_POST['id']);
+            header('Location: ?page=leads');
+            exit;
+            
+        case 'convert_to_deal':
+            $authService->requireAuth();
+            $deal = $dealService->convertLeadToDeal($_POST['lead_id'], $currentUser['user_id']);
+            if ($deal) {
+                header('Location: ?page=deal&id=' . $deal->getId());
+                exit;
+            } else {
+                $error = 'Невозможно конвертировать лид';
+            }
+            break;
+            
+        case 'create_deal':
+            $authService->requireAuth();
+            $data = $_POST;
+            $data['owner_id'] = $currentUser['user_id'];
+            $dealService->createDeal($data);
+            header('Location: ?page=deals');
+            exit;
     }
 }
 
-// ==================== ЗАПУСК ПРИЛОЖЕНИЯ ====================
-if (PHP_SAPI === 'cli') {
-    // CLI режим
-    main($argv);
-} else {
-    // Web режим - демонстрационная страница
-    echo "<!DOCTYPE html>";
-    echo "<html><head><title>CRM System</title>";
-    echo "<style>";
-    echo "body { font-family: Arial, sans-serif; margin: 40px; }";
-    echo ".container { max-width: 1200px; margin: 0 auto; }";
-    echo ".header { background: #2c3e50; color: white; padding: 20px; border-radius: 5px; }";
-    echo ".content { margin-top: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }";
-    echo ".module { background: #f8f9fa; padding: 15px; margin: 10px 0; border-left: 4px solid #3498db; }";
-    echo ".success { color: #27ae60; }";
-    echo ".error { color: #e74c3c; }";
-    echo "</style>";
-    echo "</head><body>";
+// ==================== ВЕБ-ИНТЕРФЕЙС ====================
+
+function renderHead(string $title = ''): void
+{
+    ?>
+    <!DOCTYPE html>
+    <html lang="ru" class="h-full bg-gray-50">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title><?= htmlspecialchars($title ? $title . ' - ' . APP_NAME : APP_NAME) ?></title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <style>
+            .sidebar-item.active { background-color: #3b82f6; color: white; }
+            .sidebar-item:hover:not(.active) { background-color: #f3f4f6; }
+            .badge { font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; }
+            .status-badge { display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; }
+        </style>
+    </head>
+    <body class="h-full">
+    <?php
+}
+
+function renderHeader(?array $user): void
+{
+    ?>
+    <header class="bg-white shadow">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-cube text-blue-600 text-2xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h1 class="text-2xl font-bold text-gray-900"><?= APP_NAME ?></h1>
+                        <p class="text-sm text-gray-500">Управление клиентскими отношениями</p>
+                    </div>
+                </div>
+                
+                <?php if ($user): ?>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <p class="text-sm font-medium text-gray-900"><?= htmlspecialchars($user['name']) ?></p>
+                        <p class="text-xs text-gray-500"><?= htmlspecialchars(ucfirst($user['role'])) ?></p>
+                    </div>
+                    <div class="relative">
+                        <button onclick="document.getElementById('user-menu').classList.toggle('hidden')" 
+                                class="flex items-center text-sm rounded-full focus:outline-none">
+                            <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                <i class="fas fa-user text-blue-600"></i>
+                            </div>
+                        </button>
+                        <div id="user-menu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+                            <form method="POST">
+                                <input type="hidden" name="_action" value="logout">
+                                <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <i class="fas fa-sign-out-alt mr-2"></i>Выйти
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </header>
+    <?php
+}
+
+function renderSidebar(?array $user, string $currentPage): void
+{
+    if (!$user) return;
     
-    echo "<div class='container'>";
-    echo "<div class='header'>";
-    echo "<h1>CRM System v" . APP_VERSION . "</h1>";
-    echo "<p>Полнофункциональная CRM система в одном файле</p>";
-    echo "</div>";
+    $menuItems = [
+        'dashboard' => ['icon' => 'tachometer-alt', 'label' => 'Дашборд'],
+        'leads' => ['icon' => 'users', 'label' => 'Лиды'],
+        'deals' => ['icon' => 'handshake', 'label' => 'Сделки'],
+        'analytics' => ['icon' => 'chart-bar', 'label' => 'Аналитика'],
+    ];
     
-    echo "<div class='content'>";
-    echo "<h2>Архитектура системы</h2>";
-    echo "<div class='module'>";
-    echo "<h3>Clean Architecture + DDD + Hexagonal</h3>";
-    echo "<p>Система разделена на слои с четкими границами ответственности:</p>";
-    echo "<ul>";
-    echo "<li><strong>Domain Layer</strong> - Бизнес-логика и сущности (Lead, Deal, User)</li>";
-    echo "<li><strong>Application Layer</strong> - Сервисы и use cases</li>";
-    echo "<li><strong>Infrastructure Layer</strong> - Репозитории, внешние API, базы данных</li>";
-    echo "<li><strong>Interface Layer</strong> - CLI, Web API, консоль</li>";
-    echo "</ul>";
-    echo "</div>";
+    if ($user['role'] === 'admin') {
+        $menuItems['users'] = ['icon' => 'user-cog', 'label' => 'Пользователи'];
+    }
     
-    echo "<div class='module'>";
-    echo "<h3>Реализованные модули</h3>";
-    echo "<ul>";
-    echo "<li><span class='success'>✓</span> IAM (Identity & Access Management)</li>";
-    echo "<li><span class='success'>✓</span> Sales (Управление лидами и сделками)</li>";
-    echo "<li><span class='success'>✓</span> Infrastructure (DI, MessageBus, Storage, Audit)</li>";
-    echo "<li><span class='success'>✓</span> Console CLI (Интерфейс командной строки)</li>";
-    echo "</ul>";
-    echo "</div>";
+    ?>
+    <div class="flex">
+        <div class="w-64 bg-white shadow-md min-h-screen">
+            <nav class="mt-5 px-2">
+                <?php foreach ($menuItems as $page => $item): ?>
+                <a href="?page=<?= $page ?>" 
+                   class="sidebar-item group flex items-center px-2 py-3 text-sm font-medium rounded-md mb-1 
+                          <?= $currentPage === $page ? 'active' : 'text-gray-600 hover:text-gray-900' ?>">
+                    <i class="fas fa-<?= $item['icon'] ?> mr-3 flex-shrink-0 w-6 text-center"></i>
+                    <?= $item['label'] ?>
+                </a>
+                <?php endforeach; ?>
+            </nav>
+            
+            <div class="mt-8 px-4">
+                <div class="bg-blue-50 rounded-lg p-4">
+                    <h3 class="text-sm font-medium text-blue-800">CRM v<?= APP_VERSION ?></h3>
+                    <p class="mt-1 text-xs text-blue-700">
+                        Система управления клиентами на основе Clean Architecture
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex-1">
+    <?php
+}
+
+function renderFooter(): void
+{
+    ?>
+        </div> <!-- закрываем flex-1 -->
+    </div> <!-- закрываем flex -->
+    <footer class="bg-white border-t border-gray-200 py-4">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-sm text-gray-500">
+                &copy; <?= date('Y') ?> <?= APP_NAME ?>. Все права защищены.
+            </p>
+        </div>
+    </footer>
+    <script>
+        // Закрытие меню при клике вне его
+        document.addEventListener('click', function(event) {
+            const menu = document.getElementById('user-menu');
+            const button = event.target.closest('button');
+            
+            if (menu && !button && !menu.contains(event.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+    </script>
+    </body>
+    </html>
+    <?php
+}
+
+function renderLoginPage(AuthService $auth): void
+{
+    global $error;
     
-    echo "<div class='module'>";
-    echo "<h3>Технологии и подходы</h3>";
-    echo "<ul>";
-    echo "<li>PHP 8.1+ с strict typing</li>";
-    echo "<li>Value Objects для обеспечения целостности данных</li>";
-    echo "<li>Интерфейсы и контракты для слабой связанности</li>";
-    echo "<li>Dependency Injection для управления зависимостями</li>";
-    echo "<li>InMemory репозитории для демонстрации</li>";
-    echo "<li>Event-driven архитектура через Message Bus</li>";
-    echo "</ul>";
-    echo "</div>";
+    renderHead('Вход в систему');
+    ?>
+    <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-8">
+            <div>
+                <div class="mx-auto h-12 w-12 flex items-center justify-center rounded-md bg-blue-100">
+                    <i class="fas fa-cube text-blue-600 text-2xl"></i>
+                </div>
+                <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                    Вход в CRM систему
+                </h2>
+                <p class="mt-2 text-center text-sm text-gray-600">
+                    Используйте свои учетные данные для входа
+                </p>
+            </div>
+            
+            <?php if (isset($error)): ?>
+            <div class="bg-red-50 border-l-4 border-red-400 p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-circle text-red-400"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-red-700"><?= htmlspecialchars($error) ?></p>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <form class="mt-8 space-y-6" method="POST">
+                <input type="hidden" name="_action" value="login">
+                <div class="rounded-md shadow-sm -space-y-px">
+                    <div>
+                        <label for="email" class="sr-only">Email</label>
+                        <input id="email" name="email" type="email" required 
+                               class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                               placeholder="Email адрес" value="manager@crm.local">
+                    </div>
+                    <div>
+                        <label for="password" class="sr-only">Пароль</label>
+                        <input id="password" name="password" type="password" required 
+                               class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                               placeholder="Пароль" value="manager123">
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit" 
+                            class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                            <i class="fas fa-sign-in-alt text-blue-500 group-hover:text-blue-400"></i>
+                        </span>
+                        Войти в систему
+                    </button>
+                </div>
+                
+                <div class="text-sm text-center text-gray-600">
+                    <p>Тестовые учетные записи:</p>
+                    <p class="text-xs mt-1">Админ: admin@crm.local / admin123</p>
+                    <p class="text-xs">Менеджер: manager@crm.local / manager123</p>
+                </div>
+            </form>
+        </div>
+    </div>
+    <?php
+    renderFooter();
+}
+
+function renderDashboardPage(
+    AuthService $auth, 
+    LeadService $leadService, 
+    DealService $dealService, 
+    UserRepository $userRepository,
+    LeadRepository $leadRepository,
+    DealRepository $dealRepository
+): void {
+    $currentUser = $auth->getCurrentUser();
+    $leadStats = $leadService->getLeadStats();
+    $dealStats = $dealService->getDealStats();
+    $allLeads = $leadRepository->findAll();
+    $allDeals = $dealRepository->findAll();
     
-    echo "<p><strong>Для работы с системой используйте CLI интерфейс:</strong></p>";
-    echo "<pre>php crm_system.php demo</pre>";
-    echo "<pre>php crm_system.php lead:list</pre>";
-    echo "<pre>php crm_system.php user:list</pre>";
+    renderHead('Дашборд');
+    renderHeader($currentUser);
+    renderSidebar($currentUser, 'dashboard');
+    ?>
+    <div class="p-6">
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold text-gray-900">Дашборд</h2>
+            <p class="text-gray-600">Обзорная информация и ключевые метрики</p>
+        </div>
+        
+        <!-- Статистика -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-12 w-12 rounded-md bg-blue-100 flex items-center justify-center">
+                            <i class="fas fa-users text-blue-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-medium text-gray-900">Всего лидов</h3>
+                        <p class="text-3xl font-bold text-gray-900"><?= $leadStats['total'] ?></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-12 w-12 rounded-md bg-green-100 flex items-center justify-center">
+                            <i class="fas fa-handshake text-green-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-medium text-gray-900">Всего сделок</h3>
+                        <p class="text-3xl font-bold text-gray-900"><?= $dealStats['total'] ?></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-12 w-12 rounded-md bg-yellow-100 flex items-center justify-center">
+                            <i class="fas fa-chart-line text-yellow-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-medium text-gray-900">Оборот</h3>
+                        <p class="text-3xl font-bold text-gray-900"><?= $dealStats['total_value'] ?></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-12 w-12 rounded-md bg-purple-100 flex items-center justify-center">
+                            <i class="fas fa-user-friends text-purple-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-medium text-gray-900">Пользователи</h3>
+                        <p class="text-3xl font-bold text-gray-900"><?= $userRepository->count() ?></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Статусы лидов -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Статусы лидов</h3>
+                </div>
+                <div class="p-6">
+                    <div class="space-y-4">
+                        <?php foreach ($leadStats as $status => $count): 
+                            if (!in_array($status, ['new', 'in_progress', 'qualified', 'converted', 'disqualified'])) continue;
+                            $statusObj = new LeadStatus($status);
+                        ?>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <span class="status-badge bg-<?= $statusObj->getColor() ?>-100 text-<?= $statusObj->getColor() ?>-800">
+                                    <?= $statusObj->getName() ?>
+                                </span>
+                            </div>
+                            <div class="text-lg font-semibold text-gray-900"><?= $count ?></div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Стадии сделок -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Стадии сделок</h3>
+                </div>
+                <div class="p-6">
+                    <div class="space-y-4">
+                        <?php foreach ($dealStats as $stage => $count): 
+                            if (!in_array($stage, ['prospecting', 'qualification', 'proposal', 'negotiation', 'closed_won', 'closed_lost'])) continue;
+                            $stageColors = [
+                                'prospecting' => 'gray',
+                                'qualification' => 'blue',
+                                'proposal' => 'yellow',
+                                'negotiation' => 'purple',
+                                'closed_won' => 'green',
+                                'closed_lost' => 'red',
+                            ];
+                        ?>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <span class="status-badge bg-<?= $stageColors[$stage] ?>-100 text-<?= $stageColors[$stage] ?>-800">
+                                    <?= ucfirst(str_replace('_', ' ', $stage)) ?>
+                                </span>
+                            </div>
+                            <div class="text-lg font-semibold text-gray-900"><?= $count ?></div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Последние лиды -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-medium text-gray-900">Последние лиды</h3>
+                <a href="?page=leads" class="text-sm text-blue-600 hover:text-blue-800">Все лиды →</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Клиент</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Источник</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бюджет</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <?php foreach (array_slice($allLeads, 0, 5) as $lead): ?>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                        <i class="fas fa-user text-blue-600"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($lead->getContactName()) ?></div>
+                                        <div class="text-sm text-gray-500"><?= htmlspecialchars($lead->getTitle()) ?></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <?php $status = $lead->getStatus(); ?>
+                                <span class="status-badge bg-<?= $status->getColor() ?>-100 text-<?= $status->getColor() ?>-800">
+                                    <?= $status->getName() ?>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <i class="fas fa-<?= $lead->getSource()->getIcon() ?> mr-1"></i>
+                                <?= $lead->getSource()->getName() ?>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <?= $lead->getEstimatedValue() ?? '—' ?>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <?= $lead->getCreatedAt()->format('d.m.Y') ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Быстрые действия -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Быстрые действия</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <a href="?page=create_lead" 
+                   class="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
+                    <i class="fas fa-plus text-gray-400 mr-2"></i>
+                    <span class="text-gray-700">Добавить лид</span>
+                </a>
+                <a href="?page=create_deal" 
+                   class="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors">
+                    <i class="fas fa-handshake text-gray-400 mr-2"></i>
+                    <span class="text-gray-700">Создать сделку</span>
+                </a>
+                <a href="?page=analytics" 
+                   class="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors">
+                    <i class="fas fa-chart-bar text-gray-400 mr-2"></i>
+                    <span class="text-gray-700">Отчеты</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    <?php
+    renderFooter();
+}
+
+function renderLeadsPage(
+    AuthService $auth, 
+    LeadService $leadService, 
+    LeadRepository $leadRepository, 
+    UserRepository $userRepository
+): void {
+    $currentUser = $auth->getCurrentUser();
+    $allLeads = $leadRepository->findAll();
+    $statusFilter = $_GET['status'] ?? null;
     
-    echo "</div></div></body></html>";
+    if ($statusFilter) {
+        $allLeads = $leadRepository->findByStatus($statusFilter);
+    }
+    
+    renderHead('Лиды');
+    renderHeader($currentUser);
+    renderSidebar($currentUser, 'leads');
+    ?>
+    <div class="p-6">
+        <div class="mb-8 flex justify-between items-center">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">Лиды</h2>
+                <p class="text-gray-600">Управление потенциальными клиентами</p>
+            </div>
+            <a href="?page=create_lead" 
+               class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <i class="fas fa-plus mr-2"></i>Добавить лид
+            </a>
+        </div>
+        
+        <!-- Фильтры -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="flex flex-wrap gap-2">
+                <a href="?page=leads" 
+                   class="px-3 py-1 rounded-full text-sm <?= !$statusFilter ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800 hover:bg-gray-200' ?>">
+                    Все (<?= $leadRepository->count() ?>)
+                </a>
+                <?php foreach (['new', 'in_progress', 'qualified', 'converted', 'disqualified'] as $status): 
+                    $statusObj = new LeadStatus($status);
+                ?>
+                <a href="?page=leads&status=<?= $status ?>" 
+                   class="px-3 py-1 rounded-full text-sm <?= $statusFilter === $status ? 'bg-' . $statusObj->getColor() . '-100 text-' . $statusObj->getColor() . '-800' : 'bg-gray-100 text-gray-800 hover:bg-gray-200' ?>">
+                    <?= $statusObj->getName() ?> (<?= $leadRepository->countByStatus($status) ?>)
+                </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        
+        <!-- Таблица лидов -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Клиент</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Контакты</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бюджет</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <?php foreach ($allLeads as $lead): ?>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                        <i class="fas fa-user text-blue-600"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($lead->getContactName()) ?></div>
+                                        <div class="text-sm text-gray-500"><?= htmlspecialchars($lead->getTitle()) ?></div>
+                                        <?php if ($lead->getCompany()): ?>
+                                        <div class="text-xs text-gray-400"><?= htmlspecialchars($lead->getCompany()) ?></div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-900"><?= htmlspecialchars($lead->getContactEmail()) ?></div>
+                                <?php if ($lead->getContactPhone()): ?>
+                                <div class="text-sm text-gray-500"><?= $lead->getContactPhone() ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <?php $status = $lead->getStatus(); ?>
+                                <span class="status-badge bg-<?= $status->getColor() ?>-100 text-<?= $status->getColor() ?>-800">
+                                    <?= $status->getName() ?>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <?= $lead->getEstimatedValue() ?? '—' ?>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <?= $lead->getCreatedAt()->format('d.m.Y') ?>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex space-x-2">
+                                    <a href="?page=lead&id=<?= $lead->getId() ?>" 
+                                       class="text-blue-600 hover:text-blue-900" title="Просмотр">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="?page=edit_lead&id=<?= $lead->getId() ?>" 
+                                       class="text-yellow-600 hover:text-yellow-900" title="Редактировать">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <?php if ($lead->getStatus()->getValue() === 'qualified'): ?>
+                                    <form method="POST" class="inline">
+                                        <input type="hidden" name="_action" value="convert_to_deal">
+                                        <input type="hidden" name="lead_id" value="<?= $lead->getId() ?>">
+                                        <button type="submit" class="text-green-600 hover:text-green-900" title="Конвертировать в сделку">
+                                            <i class="fas fa-handshake"></i>
+                                        </button>
+                                    </form>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <?php if (empty($allLeads)): ?>
+            <div class="text-center py-12">
+                <i class="fas fa-users text-gray-300 text-4xl mb-4"></i>
+                <p class="text-gray-500">Лиды не найдены</p>
+                <a href="?page=create_lead" class="text-blue-600 hover:text-blue-800 text-sm">Создать первый лид</a>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php
+    renderFooter();
+}
+
+function renderCreateLeadPage(AuthService $auth): void
+{
+    $currentUser = $auth->getCurrentUser();
+    
+    renderHead('Новый лид');
+    renderHeader($currentUser);
+    renderSidebar($currentUser, 'leads');
+    ?>
+    <div class="p-6">
+        <div class="max-w-3xl mx-auto">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-gray-900">Новый лид</h2>
+                <p class="text-gray-600">Заполните информацию о потенциальном клиенте</p>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <form method="POST" class="space-y-6">
+                    <input type="hidden" name="_action" value="create_lead">
+                    
+                    <div>
+                        <label for="title" class="block text-sm font-medium text-gray-700">Название лида *</label>
+                        <input type="text" id="title" name="title" required 
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                               placeholder="Например: Запрос на интеграцию CRM">
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="contact_name" class="block text-sm font-medium text-gray-700">Имя контакта *</label>
+                            <input type="text" id="contact_name" name="contact_name" required 
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                   placeholder="Иван Иванов">
+                        </div>
+                        
+                        <div>
+                            <label for="contact_email" class="block text-sm font-medium text-gray-700">Email *</label>
+                            <input type="email" id="contact_email" name="contact_email" required 
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                   placeholder="ivan@example.com">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="contact_phone" class="block text-sm font-medium text-gray-700">Телефон</label>
+                            <input type="tel" id="contact_phone" name="contact_phone" 
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                   placeholder="+7 (912) 345-67-89">
+                        </div>
+                        
+                        <div>
+                            <label for="company" class="block text-sm font-medium text-gray-700">Компания</label>
+                            <input type="text" id="company" name="company" 
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                   placeholder="ООО 'Рога и копыта'">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="source" class="block text-sm font-medium text-gray-700">Источник</label>
+                            <select id="source" name="source" 
+                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="website">Сайт</option>
+                                <option value="phone">Телефон</option>
+                                <option value="email">Email</option>
+                                <option value="referral">Рекомендация</option>
+                                <option value="social">Соцсети</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label for="estimated_value" class="block text-sm font-medium text-gray-700">Ожидаемый бюджет</label>
+                            <input type="number" id="estimated_value" name="estimated_value" min="0" step="1000" 
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                   placeholder="50000">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="notes" class="block text-sm font-medium text-gray-700">Заметки</label>
+                        <textarea id="notes" name="notes" rows="3" 
+                                  class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                  placeholder="Дополнительная информация о лиде"></textarea>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                        <a href="?page=leads" 
+                           class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Отмена
+                        </a>
+                        <button type="submit" 
+                                class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Создать лид
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php
+    renderFooter();
+}
+
+function renderLeadDetailPage(
+    AuthService $auth, 
+    LeadRepository $leadRepository, 
+    UserRepository $userRepository
+): void {
+    $leadId = $_GET['id'] ?? null;
+    $lead = $leadId ? $leadRepository->findById($leadId) : null;
+    
+    if (!$lead) {
+        header('Location: ?page=leads');
+        exit;
+    }
+    
+    $currentUser = $auth->getCurrentUser();
+    
+    renderHead('Лид: ' . $lead->getContactName());
+    renderHeader($currentUser);
+    renderSidebar($currentUser, 'leads');
+    ?>
+    <div class="p-6">
+        <div class="max-w-6xl mx-auto">
+            <div class="mb-8 flex justify-between items-start">
+                <div>
+                    <div class="flex items-center mb-2">
+                        <h2 class="text-2xl font-bold text-gray-900 mr-3"><?= htmlspecialchars($lead->getContactName()) ?></h2>
+                        <?php $status = $lead->getStatus(); ?>
+                        <span class="status-badge bg-<?= $status->getColor() ?>-100 text-<?= $status->getColor() ?>-800">
+                            <?= $status->getName() ?>
+                        </span>
+                    </div>
+                    <p class="text-gray-600"><?= htmlspecialchars($lead->getTitle()) ?></p>
+                    <?php if ($lead->getCompany()): ?>
+                    <p class="text-gray-500"><?= htmlspecialchars($lead->getCompany()) ?></p>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="flex space-x-2">
+                    <a href="?page=edit_lead&id=<?= $lead->getId() ?>" 
+                       class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        <i class="fas fa-edit mr-2"></i>Редактировать
+                    </a>
+                    
+                    <?php if ($lead->getStatus()->getValue() === 'qualified'): ?>
+                    <form method="POST">
+                        <input type="hidden" name="_action" value="convert_to_deal">
+                        <input type="hidden" name="lead_id" value="<?= $lead->getId() ?>">
+                        <button type="submit" 
+                                class="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+                            <i class="fas fa-handshake mr-2"></i>В сделку
+                        </button>
+                    </form>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Основная информация -->
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h3 class="text-lg font-medium text-gray-900">Информация о лиде</h3>
+                        </div>
+                        <div class="p-6">
+                            <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <dt class="text-sm font-medium text-gray-500">Email</dt>
+                                    <dd class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($lead->getContactEmail()) ?></dd>
+                                </div>
+                                
+                                <?php if ($lead->getContactPhone()): ?>
+                                <div>
+                                    <dt class="text-sm font-medium text-gray-500">Телефон</dt>
+                                    <dd class="mt-1 text-sm text-gray-900"><?= $lead->getContactPhone() ?></dd>
+                                </div>
+                                <?php endif; ?>
+                                
+                                <div>
+                                    <dt class="text-sm font-medium text-gray-500">Источник</dt>
+                                    <dd class="mt-1 text-sm text-gray-900">
+                                        <i class="fas fa-<?= $lead->getSource()->getIcon() ?> mr-1"></i>
+                                        <?= $lead->getSource()->getName() ?>
+                                    </dd>
+                                </div>
+                                
+                                <div>
+                                    <dt class="text-sm font-medium text-gray-500">Ожидаемый бюджет</dt>
+                                    <dd class="mt-1 text-sm text-gray-900 font-medium">
+                                        <?= $lead->getEstimatedValue() ?? 'Не указан' ?>
+                                    </dd>
+                                </div>
+                                
+                                <div>
+                                    <dt class="text-sm font-medium text-gray-500">Дата создания</dt>
+                                    <dd class="mt-1 text-sm text-gray-900"><?= $lead->getCreatedAt()->format('d.m.Y H:i') ?></dd>
+                                </div>
+                                
+                                <div>
+                                    <dt class="text-sm font-medium text-gray-500">Последнее обновление</dt>
+                                    <dd class="mt-1 text-sm text-gray-900"><?= $lead->getUpdatedAt()->format('d.m.Y H:i') ?></dd>
+                                </div>
+                            </dl>
+                        </div>
+                    </div>
+                    
+                    <!-- Заметки -->
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h3 class="text-lg font-medium text-gray-900">Заметки</h3>
+                        </div>
+                        <div class="p-6">
+                            <div class="space-y-4">
+                                <?php foreach (array_reverse($lead->getNotes()) as $note): ?>
+                                <div class="border-l-4 border-blue-500 pl-4 py-2">
+                                    <p class="text-sm text-gray-800"><?= htmlspecialchars($note['text']) ?></p>
+                                    <p class="text-xs text-gray-500 mt-1"><?= $note['timestamp']->format('d.m.Y H:i') ?></p>
+                                </div>
+                                <?php endforeach; ?>
+                                
+                                <?php if (empty($lead->getNotes())): ?>
+                                <p class="text-gray-500 text-center py-4">Заметок пока нет</p>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <form method="POST" class="mt-6">
+                                <input type="hidden" name="_action" value="update_lead">
+                                <input type="hidden" name="id" value="<?= $lead->getId() ?>">
+                                <div>
+                                    <label for="new_note" class="sr-only">Новая заметка</label>
+                                    <textarea id="new_note" name="notes" rows="2" 
+                                              class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                              placeholder="Добавить заметку..."></textarea>
+                                </div>
+                                <div class="mt-2 flex justify-end">
+                                    <button type="submit" 
+                                            class="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                                        Добавить заметку
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Боковая панель -->
+                <div class="space-y-6">
+                    <!-- Быстрые действия -->
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="px-4 py-3 border-b border-gray-200">
+                            <h3 class="text-sm font-medium text-gray-900">Быстрые действия</h3>
+                        </div>
+                        <div class="p-4">
+                            <form method="POST" class="space-y-3">
+                                <input type="hidden" name="_action" value="update_lead">
+                                <input type="hidden" name="id" value="<?= $lead->getId() ?>">
+                                
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">Изменить статус</label>
+                                    <select name="status" 
+                                            class="block w-full border border-gray-300 rounded-md shadow-sm py-1 px-2 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                            onchange="this.form.submit()">
+                                        <?php foreach (['new', 'in_progress', 'qualified', 'converted', 'disqualified'] as $status): 
+                                            $statusObj = new LeadStatus($status);
+                                        ?>
+                                        <option value="<?= $status ?>" <?= $lead->getStatus()->getValue() === $status ? 'selected' : '' ?>>
+                                            <?= $statusObj->getName() ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">Обновить бюджет</label>
+                                    <div class="flex">
+                                        <input type="number" name="estimated_value" 
+                                               value="<?= $lead->getEstimatedValue() ? $lead->getEstimatedValue()->getFloatAmount() : '' ?>" 
+                                               step="1000" min="0"
+                                               class="flex-1 border border-gray-300 rounded-l-md shadow-sm py-1 px-2 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                        <button type="submit" 
+                                                class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-md px-2 text-sm hover:bg-gray-200">
+                                            OK
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Информация о назначении -->
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="px-4 py-3 border-b border-gray-200">
+                            <h3 class="text-sm font-medium text-gray-900">Назначение</h3>
+                        </div>
+                        <div class="p-4">
+                            <?php if ($lead->getAssignedTo()): 
+                                $user = $userRepository->findById($lead->getAssignedTo());
+                            ?>
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <i class="fas fa-user text-blue-600 text-sm"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm font-medium text-gray-900"><?= htmlspecialchars($user->getFullName()) ?></p>
+                                    <p class="text-xs text-gray-500"><?= htmlspecialchars(ucfirst($user->getRole())) ?></p>
+                                </div>
+                            </div>
+                            <?php else: ?>
+                            <p class="text-sm text-gray-500">Не назначен</p>
+                            <form method="POST" class="mt-2">
+                                <input type="hidden" name="_action" value="update_lead">
+                                <input type="hidden" name="id" value="<?= $lead->getId() ?>">
+                                <input type="hidden" name="assigned_to" value="<?= $currentUser['user_id'] ?>">
+                                <button type="submit" 
+                                        class="text-xs text-blue-600 hover:text-blue-800">
+                                    Назначить на себя
+                                </button>
+                            </form>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php
+    renderFooter();
+}
+
+function renderDealsPage(
+    AuthService $auth, 
+    DealRepository $dealRepository, 
+    LeadRepository $leadRepository,
+    UserRepository $userRepository
+): void {
+    $currentUser = $auth->getCurrentUser();
+    $allDeals = $dealRepository->findAll();
+    
+    renderHead('Сделки');
+    renderHeader($currentUser);
+    renderSidebar($currentUser, 'deals');
+    ?>
+    <div class="p-6">
+        <div class="mb-8 flex justify-between items-center">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">Сделки</h2>
+                <p class="text-gray-600">Управление коммерческими предложениями</p>
+            </div>
+            <a href="?page=create_deal" 
+               class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                <i class="fas fa-plus mr-2"></i>Новая сделка
+            </a>
+        </div>
+        
+        <!-- Статистика сделок -->
+        <?php
+        $dealStats = [
+            'prospecting' => $dealRepository->countByStage('prospecting'),
+            'qualification' => $dealRepository->countByStage('qualification'),
+            'proposal' => $dealRepository->countByStage('proposal'),
+            'negotiation' => $dealRepository->countByStage('negotiation'),
+            'closed_won' => $dealRepository->countByStage('closed_won'),
+            'closed_lost' => $dealRepository->countByStage('closed_lost'),
+        ];
+        ?>
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+            <?php foreach ($dealStats as $stage => $count): 
+                $colors = [
+                    'prospecting' => 'gray',
+                    'qualification' => 'blue',
+                    'proposal' => 'yellow',
+                    'negotiation' => 'purple',
+                    'closed_won' => 'green',
+                    'closed_lost' => 'red',
+                ];
+            ?>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <div class="text-2xl font-bold text-<?= $colors[$stage] ?>-600"><?= $count ?></div>
+                <div class="text-xs text-gray-500 mt-1"><?= ucfirst(str_replace('_', ' ', $stage)) ?></div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        
+        <!-- Таблица сделок -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Название</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Стадия</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Сумма</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Вероятность</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Владелец</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <?php foreach ($allDeals as $deal): ?>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4">
+                                <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($deal->getTitle()) ?></div>
+                                <div class="text-sm text-gray-500">
+                                    <?php 
+                                    $lead = $leadRepository->findById($deal->getLeadId());
+                                    echo $lead ? htmlspecialchars($lead->getContactName()) : 'Лид не найден';
+                                    ?>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="status-badge bg-<?= $deal->getStageColor() ?>-100 text-<?= $deal->getStageColor() ?>-800">
+                                    <?= $deal->getStageName() ?>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                <?= $deal->getAmount() ?>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="w-24 bg-gray-200 rounded-full h-2 mr-3">
+                                        <div class="bg-blue-600 h-2 rounded-full" style="width: <?= $deal->getProbability() ?>%"></div>
+                                    </div>
+                                    <span class="text-sm text-gray-900"><?= $deal->getProbability() ?>%</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <?php 
+                                $owner = $userRepository->findById($deal->getOwnerId());
+                                echo $owner ? htmlspecialchars($owner->getFirstName()) : 'Неизвестно';
+                                ?>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <?= $deal->getCreatedAt()->format('d.m.Y') ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <?php if (empty($allDeals)): ?>
+            <div class="text-center py-12">
+                <i class="fas fa-handshake text-gray-300 text-4xl mb-4"></i>
+                <p class="text-gray-500">Сделки не найдены</p>
+                <a href="?page=create_deal" class="text-green-600 hover:text-green-800 text-sm">Создать первую сделку</a>
+                <p class="text-sm text-gray-400 mt-2">Или конвертируйте квалифицированный лид в сделку</p>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php
+    renderFooter();
+}
+
+function renderAnalyticsPage(
+    AuthService $auth, 
+    LeadService $leadService, 
+    DealService $dealService
+): void {
+    $currentUser = $auth->getCurrentUser();
+    $leadStats = $leadService->getLeadStats();
+    $dealStats = $dealService->getDealStats();
+    
+    renderHead('Аналитика');
+    renderHeader($currentUser);
+    renderSidebar($currentUser, 'analytics');
+    ?>
+    <div class="p-6">
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold text-gray-900">Аналитика и отчеты</h2>
+            <p class="text-gray-600">Ключевые метрики и статистика эффективности</p>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- График лидов -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Распределение лидов по статусам</h3>
+                <div class="space-y-4">
+                    <?php 
+                    $leadStatuses = ['new', 'in_progress', 'qualified', 'converted', 'disqualified'];
+                    $totalLeads = $leadStats['total'];
+                    foreach ($leadStatuses as $status):
+                        $count = $leadStats[$status];
+                        $percentage = $totalLeads > 0 ? ($count / $totalLeads * 100) : 0;
+                        $statusObj = new LeadStatus($status);
+                    ?>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="font-medium text-gray-700"><?= $statusObj->getName() ?></span>
+                            <span class="text-gray-900"><?= $count ?> (<?= round($percentage, 1) ?>%)</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-<?= $statusObj->getColor() ?>-600 h-2 rounded-full" style="width: <?= $percentage ?>%"></div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            
+            <!-- График сделок -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Распределение сделок по стадиям</h3>
+                <div class="space-y-4">
+                    <?php 
+                    $stages = ['prospecting', 'qualification', 'proposal', 'negotiation', 'closed_won', 'closed_lost'];
+                    $totalDeals = $dealStats['total'];
+                    foreach ($stages as $stage):
+                        $count = $dealStats[$stage];
+                        $percentage = $totalDeals > 0 ? ($count / $totalDeals * 100) : 0;
+                        $colors = [
+                            'prospecting' => 'gray',
+                            'qualification' => 'blue',
+                            'proposal' => 'yellow',
+                            'negotiation' => 'purple',
+                            'closed_won' => 'green',
+                            'closed_lost' => 'red',
+                        ];
+                    ?>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="font-medium text-gray-700"><?= ucfirst(str_replace('_', ' ', $stage)) ?></span>
+                            <span class="text-gray-900"><?= $count ?> (<?= round($percentage, 1) ?>%)</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-<?= $colors[$stage] ?>-600 h-2 rounded-full" style="width: <?= $percentage ?>%"></div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Показатели эффективности -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-6">Ключевые показатели</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="text-center p-4 border rounded-lg">
+                    <div class="text-3xl font-bold text-blue-600 mb-2">
+                        <?= $totalLeads > 0 ? round(($leadStats['converted'] / $totalLeads * 100), 1) : 0 ?>%
+                    </div>
+                    <div class="text-sm text-gray-600">Конверсия лидов</div>
+                    <div class="text-xs text-gray-400 mt-1">лиды → сделки</div>
+                </div>
+                
+                <div class="text-center p-4 border rounded-lg">
+                    <div class="text-3xl font-bold text-green-600 mb-2">
+                        <?= $dealStats['total'] > 0 ? round(($dealStats['closed_won'] / $dealStats['total'] * 100), 1) : 0 ?>%
+                    </div>
+                    <div class="text-sm text-gray-600">Успешных сделок</div>
+                    <div class="text-xs text-gray-400 mt-1">win rate</div>
+                </div>
+                
+                <div class="text-center p-4 border rounded-lg">
+                    <div class="text-3xl font-bold text-purple-600 mb-2">
+                        <?= $dealStats['total_value'] ?>
+                    </div>
+                    <div class="text-sm text-gray-600">Общий оборот</div>
+                    <div class="text-xs text-gray-400 mt-1">все сделки</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Рекомендации -->
+        <div class="bg-white rounded-lg shadow p-6 mt-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Рекомендации</h3>
+            <div class="space-y-3">
+                <?php if ($leadStats['qualified'] > 0): ?>
+                <div class="flex items-start">
+                    <i class="fas fa-lightbulb text-yellow-500 mt-1 mr-3"></i>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900"><?= $leadStats['qualified'] ?> квалифицированных лида готовы к конвертации</p>
+                        <p class="text-xs text-gray-500">Рекомендуем создать сделки для этих лидов</p>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
+                <?php if ($leadStats['new'] > 5): ?>
+                <div class="flex items-start">
+                    <i class="fas fa-exclamation-triangle text-red-500 mt-1 mr-3"></i>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900"><?= $leadStats['new'] ?> новых лидов требуют обработки</p>
+                        <p class="text-xs text-gray-500">Рекомендуем назначить ответственных менеджеров</p>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
+                <?php if ($dealStats['negotiation'] > 0): ?>
+                <div class="flex items-start">
+                    <i class="fas fa-handshake text-green-500 mt-1 mr-3"></i>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900"><?= $dealStats['negotiation'] ?> сделок на стадии переговоров</p>
+                        <p class="text-xs text-gray-500">Высокая вероятность закрытия. Уделите внимание этим сделкам</p>
+                    </div>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <?php
+    renderFooter();
+}
+
+// ==================== ГЛАВНЫЙ РОУТЕР ====================
+
+if (!$authService->isLoggedIn() && $page !== 'login') {
+    $page = 'login';
+}
+
+switch ($page) {
+    case 'login':
+        renderLoginPage($authService);
+        break;
+        
+    case 'dashboard':
+        renderDashboardPage(
+            $authService, 
+            $leadService, 
+            $dealService, 
+            $userRepository,
+            $leadRepository,
+            $dealRepository
+        );
+        break;
+        
+    case 'leads':
+        renderLeadsPage($authService, $leadService, $leadRepository, $userRepository);
+        break;
+        
+    case 'lead':
+        renderLeadDetailPage($authService, $leadRepository, $userRepository);
+        break;
+        
+    case 'create_lead':
+        renderCreateLeadPage($authService);
+        break;
+        
+    case 'deals':
+        renderDealsPage($authService, $dealRepository, $leadRepository, $userRepository);
+        break;
+        
+    case 'analytics':
+        renderAnalyticsPage($authService, $leadService, $dealService);
+        break;
+        
+    default:
+        if ($authService->isLoggedIn()) {
+            renderDashboardPage(
+                $authService, 
+                $leadService, 
+                $dealService, 
+                $userRepository,
+                $leadRepository,
+                $dealRepository
+            );
+        } else {
+            renderLoginPage($authService);
+        }
+        break;
 }

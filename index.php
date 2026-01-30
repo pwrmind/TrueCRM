@@ -973,51 +973,71 @@ function renderHead(string $title = ''): void
         <title><?= htmlspecialchars($title ? $title . ' - ' . APP_NAME : APP_NAME) ?></title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        spacing: {
+                            '0.5': '0.125rem',
+                            '0.75': '0.1875rem',
+                        },
+                        fontSize: {
+                            '2xs': '0.625rem',
+                            '3xs': '0.5rem',
+                        }
+                    }
+                }
+            }
+        </script>
         <style>
             .sidebar-item.active { background-color: #3b82f6; color: white; }
             .sidebar-item:hover:not(.active) { background-color: #f3f4f6; }
             .badge { font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; }
-            .status-badge { display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; }
+            .status-badge { display: inline-flex; align-items: center; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+            .compact-table th { padding: 0.375rem 0.75rem !important; font-size: 0.75rem !important; }
+            .compact-table td { padding: 0.375rem 0.75rem !important; font-size: 0.8125rem !important; }
+            .compact-card { padding: 0.75rem !important; }
+            .compact-form .form-group { margin-bottom: 0.5rem !important; }
         </style>
     </head>
-    <body class="h-full">
+    <body class="h-full text-sm">
     <?php
 }
 
 function renderHeader(?array $user): void
 {
     ?>
-    <header class="bg-white shadow">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center py-4">
+    <header class="bg-white border-b border-gray-200">
+        <div class="px-4">
+            <div class="flex justify-between items-center py-2">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
-                        <i class="fas fa-cube text-blue-600 text-2xl"></i>
+                        <i class="fas fa-cube text-blue-600 text-lg"></i>
                     </div>
-                    <div class="ml-4">
-                        <h1 class="text-2xl font-bold text-gray-900"><?= APP_NAME ?></h1>
-                        <p class="text-sm text-gray-500">Управление клиентскими отношениями</p>
+                    <div class="ml-3">
+                        <h1 class="text-lg font-bold text-gray-900"><?= APP_NAME ?></h1>
+                        <p class="text-xs text-gray-500">CRM v<?= APP_VERSION ?></p>
                     </div>
                 </div>
                 
                 <?php if ($user): ?>
-                <div class="flex items-center space-x-4">
-                    <div class="text-right">
-                        <p class="text-sm font-medium text-gray-900"><?= htmlspecialchars($user['name']) ?></p>
-                        <p class="text-xs text-gray-500"><?= htmlspecialchars(ucfirst($user['role'])) ?></p>
+                <div class="flex items-center space-x-3">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-xs font-medium text-gray-900"><?= htmlspecialchars($user['name']) ?></p>
+                        <p class="text-2xs text-gray-500"><?= htmlspecialchars(ucfirst($user['role'])) ?></p>
                     </div>
                     <div class="relative">
                         <button onclick="document.getElementById('user-menu').classList.toggle('hidden')" 
                                 class="flex items-center text-sm rounded-full focus:outline-none">
-                            <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                <i class="fas fa-user text-blue-600"></i>
+                            <div class="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center">
+                                <i class="fas fa-user text-blue-600 text-sm"></i>
                             </div>
                         </button>
-                        <div id="user-menu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+                        <div id="user-menu" class="hidden absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-100">
                             <form method="POST">
                                 <input type="hidden" name="_action" value="logout">
-                                <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                    <i class="fas fa-sign-out-alt mr-2"></i>Выйти
+                                <button type="submit" class="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100">
+                                    <i class="fas fa-sign-out-alt mr-1.5 text-xs"></i>Выйти
                                 </button>
                             </form>
                         </div>
@@ -1047,23 +1067,23 @@ function renderSidebar(?array $user, string $currentPage): void
     
     ?>
     <div class="flex">
-        <div class="w-64 bg-white shadow-md min-h-screen">
-            <nav class="mt-5 px-2">
+        <div class="w-56 bg-white border-r border-gray-200 min-h-[calc(100vh-3.5rem)]">
+            <nav class="mt-3 px-2">
                 <?php foreach ($menuItems as $page => $item): ?>
                 <a href="?page=<?= $page ?>" 
-                   class="sidebar-item group flex items-center px-2 py-3 text-sm font-medium rounded-md mb-1 
+                   class="sidebar-item group flex items-center px-2 py-2 text-xs font-medium rounded mb-0.5 
                           <?= $currentPage === $page ? 'active' : 'text-gray-600 hover:text-gray-900' ?>">
-                    <i class="fas fa-<?= $item['icon'] ?> mr-3 flex-shrink-0 w-6 text-center"></i>
+                    <i class="fas fa-<?= $item['icon'] ?> mr-2.5 flex-shrink-0 w-4 text-center text-xs"></i>
                     <?= $item['label'] ?>
                 </a>
                 <?php endforeach; ?>
             </nav>
             
-            <div class="mt-8 px-4">
-                <div class="bg-blue-50 rounded-lg p-4">
-                    <h3 class="text-sm font-medium text-blue-800">CRM v<?= APP_VERSION ?></h3>
-                    <p class="mt-1 text-xs text-blue-700">
-                        Система управления клиентами на основе Clean Architecture
+            <div class="mt-6 px-3">
+                <div class="bg-blue-50 rounded p-3 border border-blue-100">
+                    <h3 class="text-xs font-medium text-blue-800">Статистика</h3>
+                    <p class="mt-0.5 text-2xs text-blue-700">
+                        Система управления на Clean Architecture
                     </p>
                 </div>
             </div>
@@ -1078,9 +1098,9 @@ function renderFooter(): void
     ?>
         </div> <!-- закрываем flex-1 -->
     </div> <!-- закрываем flex -->
-    <footer class="bg-white border-t border-gray-200 py-4">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <p class="text-center text-sm text-gray-500">
+    <footer class="bg-white border-t border-gray-200 py-2">
+        <div class="px-4">
+            <p class="text-center text-xs text-gray-500">
                 &copy; <?= date('Y') ?> <?= APP_NAME ?>. Все права защищены.
             </p>
         </div>
@@ -1107,64 +1127,64 @@ function renderLoginPage(AuthService $auth): void
     
     renderHead('Вход в систему');
     ?>
-    <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-md w-full space-y-8">
-            <div>
-                <div class="mx-auto h-12 w-12 flex items-center justify-center rounded-md bg-blue-100">
-                    <i class="fas fa-cube text-blue-600 text-2xl"></i>
+    <div class="min-h-screen flex items-center justify-center bg-gray-50 py-8 px-4">
+        <div class="max-w-sm w-full">
+            <div class="text-center mb-6">
+                <div class="mx-auto h-10 w-10 flex items-center justify-center rounded-md bg-blue-100 inline-block">
+                    <i class="fas fa-cube text-blue-600 text-xl"></i>
                 </div>
-                <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                    Вход в CRM систему
+                <h2 class="mt-3 text-xl font-bold text-gray-900">
+                    Вход в CRM
                 </h2>
-                <p class="mt-2 text-center text-sm text-gray-600">
-                    Используйте свои учетные данные для входа
+                <p class="mt-1 text-xs text-gray-600">
+                    Используйте свои учетные данные
                 </p>
             </div>
             
             <?php if (isset($error)): ?>
-            <div class="bg-red-50 border-l-4 border-red-400 p-4">
+            <div class="bg-red-50 border-l-3 border-red-400 p-3 mb-4 rounded">
                 <div class="flex">
                     <div class="flex-shrink-0">
-                        <i class="fas fa-exclamation-circle text-red-400"></i>
+                        <i class="fas fa-exclamation-circle text-red-400 text-sm"></i>
                     </div>
-                    <div class="ml-3">
-                        <p class="text-sm text-red-700"><?= htmlspecialchars($error) ?></p>
+                    <div class="ml-2">
+                        <p class="text-xs text-red-700"><?= htmlspecialchars($error) ?></p>
                     </div>
                 </div>
             </div>
             <?php endif; ?>
             
-            <form class="mt-8 space-y-6" method="POST">
+            <form class="space-y-4" method="POST">
                 <input type="hidden" name="_action" value="login">
-                <div class="rounded-md shadow-sm -space-y-px">
+                <div class="space-y-3">
                     <div>
                         <label for="email" class="sr-only">Email</label>
                         <input id="email" name="email" type="email" required 
-                               class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                               class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                placeholder="Email адрес" value="manager@crm.local">
                     </div>
                     <div>
                         <label for="password" class="sr-only">Пароль</label>
                         <input id="password" name="password" type="password" required 
-                               class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                               class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                placeholder="Пароль" value="manager123">
                     </div>
                 </div>
 
                 <div>
                     <button type="submit" 
-                            class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">
                         <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-                            <i class="fas fa-sign-in-alt text-blue-500 group-hover:text-blue-400"></i>
+                            <i class="fas fa-sign-in-alt text-blue-500 group-hover:text-blue-400 text-xs"></i>
                         </span>
                         Войти в систему
                     </button>
                 </div>
                 
-                <div class="text-sm text-center text-gray-600">
+                <div class="text-xs text-center text-gray-600 pt-2 border-t border-gray-100">
                     <p>Тестовые учетные записи:</p>
-                    <p class="text-xs mt-1">Админ: admin@crm.local / admin123</p>
-                    <p class="text-xs">Менеджер: manager@crm.local / manager123</p>
+                    <p class="text-2xs mt-0.5">Админ: admin@crm.local / admin123</p>
+                    <p class="text-2xs">Менеджер: manager@crm.local / manager123</p>
                 </div>
             </form>
         </div>
@@ -1191,79 +1211,79 @@ function renderDashboardPage(
     renderHeader($currentUser);
     renderSidebar($currentUser, 'dashboard');
     ?>
-    <div class="p-6">
-        <div class="mb-8">
-            <h2 class="text-2xl font-bold text-gray-900">Дашборд</h2>
-            <p class="text-gray-600">Обзорная информация и ключевые метрики</p>
+    <div class="p-4">
+        <div class="mb-4">
+            <h2 class="text-lg font-bold text-gray-900">Дашборд</h2>
+            <p class="text-xs text-gray-600">Обзорная информация и ключевые метрики</p>
         </div>
         
         <!-- Статистика -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow p-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div class="bg-white rounded border border-gray-200 p-3">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
-                        <div class="h-12 w-12 rounded-md bg-blue-100 flex items-center justify-center">
-                            <i class="fas fa-users text-blue-600 text-xl"></i>
+                        <div class="h-8 w-8 rounded bg-blue-100 flex items-center justify-center">
+                            <i class="fas fa-users text-blue-600 text-sm"></i>
                         </div>
                     </div>
-                    <div class="ml-4">
-                        <h3 class="text-lg font-medium text-gray-900">Всего лидов</h3>
-                        <p class="text-3xl font-bold text-gray-900"><?= $leadStats['total'] ?></p>
+                    <div class="ml-3">
+                        <h3 class="text-xs font-medium text-gray-900">Всего лидов</h3>
+                        <p class="text-xl font-bold text-gray-900"><?= $leadStats['total'] ?></p>
                     </div>
                 </div>
             </div>
             
-            <div class="bg-white rounded-lg shadow p-6">
+            <div class="bg-white rounded border border-gray-200 p-3">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
-                        <div class="h-12 w-12 rounded-md bg-green-100 flex items-center justify-center">
-                            <i class="fas fa-handshake text-green-600 text-xl"></i>
+                        <div class="h-8 w-8 rounded bg-green-100 flex items-center justify-center">
+                            <i class="fas fa-handshake text-green-600 text-sm"></i>
                         </div>
                     </div>
-                    <div class="ml-4">
-                        <h3 class="text-lg font-medium text-gray-900">Всего сделок</h3>
-                        <p class="text-3xl font-bold text-gray-900"><?= $dealStats['total'] ?></p>
+                    <div class="ml-3">
+                        <h3 class="text-xs font-medium text-gray-900">Всего сделок</h3>
+                        <p class="text-xl font-bold text-gray-900"><?= $dealStats['total'] ?></p>
                     </div>
                 </div>
             </div>
             
-            <div class="bg-white rounded-lg shadow p-6">
+            <div class="bg-white rounded border border-gray-200 p-3">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
-                        <div class="h-12 w-12 rounded-md bg-yellow-100 flex items-center justify-center">
-                            <i class="fas fa-chart-line text-yellow-600 text-xl"></i>
+                        <div class="h-8 w-8 rounded bg-yellow-100 flex items-center justify-center">
+                            <i class="fas fa-chart-line text-yellow-600 text-sm"></i>
                         </div>
                     </div>
-                    <div class="ml-4">
-                        <h3 class="text-lg font-medium text-gray-900">Оборот</h3>
-                        <p class="text-3xl font-bold text-gray-900"><?= $dealStats['total_value'] ?></p>
+                    <div class="ml-3">
+                        <h3 class="text-xs font-medium text-gray-900">Оборот</h3>
+                        <p class="text-xl font-bold text-gray-900"><?= $dealStats['total_value'] ?></p>
                     </div>
                 </div>
             </div>
             
-            <div class="bg-white rounded-lg shadow p-6">
+            <div class="bg-white rounded border border-gray-200 p-3">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
-                        <div class="h-12 w-12 rounded-md bg-purple-100 flex items-center justify-center">
-                            <i class="fas fa-user-friends text-purple-600 text-xl"></i>
+                        <div class="h-8 w-8 rounded bg-purple-100 flex items-center justify-center">
+                            <i class="fas fa-user-friends text-purple-600 text-sm"></i>
                         </div>
                     </div>
-                    <div class="ml-4">
-                        <h3 class="text-lg font-medium text-gray-900">Пользователи</h3>
-                        <p class="text-3xl font-bold text-gray-900"><?= $userRepository->count() ?></p>
+                    <div class="ml-3">
+                        <h3 class="text-xs font-medium text-gray-900">Пользователи</h3>
+                        <p class="text-xl font-bold text-gray-900"><?= $userRepository->count() ?></p>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Статусы лидов -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-medium text-gray-900">Статусы лидов</h3>
+        <!-- Статусы лидов и сделок -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+            <div class="bg-white rounded border border-gray-200 compact-card">
+                <div class="pb-2 border-b border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-900">Статусы лидов</h3>
                 </div>
-                <div class="p-6">
-                    <div class="space-y-4">
+                <div class="pt-2">
+                    <div class="space-y-2">
                         <?php foreach ($leadStats as $status => $count): 
                             if (!in_array($status, ['new', 'in_progress', 'qualified', 'converted', 'disqualified'])) continue;
                             $statusObj = new LeadStatus($status);
@@ -1274,7 +1294,7 @@ function renderDashboardPage(
                                     <?= $statusObj->getName() ?>
                                 </span>
                             </div>
-                            <div class="text-lg font-semibold text-gray-900"><?= $count ?></div>
+                            <div class="text-sm font-semibold text-gray-900"><?= $count ?></div>
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -1282,12 +1302,12 @@ function renderDashboardPage(
             </div>
             
             <!-- Стадии сделок -->
-            <div class="bg-white rounded-lg shadow">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-medium text-gray-900">Стадии сделок</h3>
+            <div class="bg-white rounded border border-gray-200 compact-card">
+                <div class="pb-2 border-b border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-900">Стадии сделок</h3>
                 </div>
-                <div class="p-6">
-                    <div class="space-y-4">
+                <div class="pt-2">
+                    <div class="space-y-2">
                         <?php foreach ($dealStats as $stage => $count): 
                             if (!in_array($stage, ['prospecting', 'qualification', 'proposal', 'negotiation', 'closed_won', 'closed_lost'])) continue;
                             $stageColors = [
@@ -1305,7 +1325,7 @@ function renderDashboardPage(
                                     <?= ucfirst(str_replace('_', ' ', $stage)) ?>
                                 </span>
                             </div>
-                            <div class="text-lg font-semibold text-gray-900"><?= $count ?></div>
+                            <div class="text-sm font-semibold text-gray-900"><?= $count ?></div>
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -1314,50 +1334,50 @@ function renderDashboardPage(
         </div>
         
         <!-- Последние лиды -->
-        <div class="bg-white rounded-lg shadow mb-8">
-            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 class="text-lg font-medium text-gray-900">Последние лиды</h3>
-                <a href="?page=leads" class="text-sm text-blue-600 hover:text-blue-800">Все лиды →</a>
+        <div class="bg-white rounded border border-gray-200 mb-4">
+            <div class="px-3 py-2 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-sm font-medium text-gray-900">Последние лиды</h3>
+                <a href="?page=leads" class="text-xs text-blue-600 hover:text-blue-800">Все лиды →</a>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
+                <table class="min-w-full divide-y divide-gray-200 compact-table">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Клиент</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Источник</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бюджет</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Клиент</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Источник</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бюджет</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         <?php foreach (array_slice($allLeads, 0, 5) as $lead): ?>
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="whitespace-nowrap">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                        <i class="fas fa-user text-blue-600"></i>
+                                    <div class="flex-shrink-0 h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center">
+                                        <i class="fas fa-user text-blue-600 text-xs"></i>
                                     </div>
-                                    <div class="ml-4">
-                                        <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($lead->getContactName()) ?></div>
-                                        <div class="text-sm text-gray-500"><?= htmlspecialchars($lead->getTitle()) ?></div>
+                                    <div class="ml-2">
+                                        <div class="text-xs font-medium text-gray-900"><?= htmlspecialchars($lead->getContactName()) ?></div>
+                                        <div class="text-2xs text-gray-500 truncate max-w-[120px]"><?= htmlspecialchars($lead->getTitle()) ?></div>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="whitespace-nowrap">
                                 <?php $status = $lead->getStatus(); ?>
                                 <span class="status-badge bg-<?= $status->getColor() ?>-100 text-<?= $status->getColor() ?>-800">
                                     <?= $status->getName() ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <i class="fas fa-<?= $lead->getSource()->getIcon() ?> mr-1"></i>
+                            <td class="whitespace-nowrap text-xs text-gray-500">
+                                <i class="fas fa-<?= $lead->getSource()->getIcon() ?> mr-0.5 text-2xs"></i>
                                 <?= $lead->getSource()->getName() ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <td class="whitespace-nowrap text-xs font-medium">
                                 <?= $lead->getEstimatedValue() ?? '—' ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="whitespace-nowrap text-xs text-gray-500">
                                 <?= $lead->getCreatedAt()->format('d.m.Y') ?>
                             </td>
                         </tr>
@@ -1368,22 +1388,22 @@ function renderDashboardPage(
         </div>
         
         <!-- Быстрые действия -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Быстрые действия</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white rounded border border-gray-200 p-3">
+            <h3 class="text-sm font-medium text-gray-900 mb-2">Быстрые действия</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
                 <a href="?page=create_lead" 
-                   class="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-                    <i class="fas fa-plus text-gray-400 mr-2"></i>
+                   class="flex items-center justify-center p-2 border border-dashed border-gray-300 rounded hover:border-blue-500 hover:bg-blue-50 transition-colors text-xs">
+                    <i class="fas fa-plus text-gray-400 mr-1.5 text-xs"></i>
                     <span class="text-gray-700">Добавить лид</span>
                 </a>
                 <a href="?page=create_deal" 
-                   class="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors">
-                    <i class="fas fa-handshake text-gray-400 mr-2"></i>
+                   class="flex items-center justify-center p-2 border border-dashed border-gray-300 rounded hover:border-green-500 hover:bg-green-50 transition-colors text-xs">
+                    <i class="fas fa-handshake text-gray-400 mr-1.5 text-xs"></i>
                     <span class="text-gray-700">Создать сделку</span>
                 </a>
                 <a href="?page=analytics" 
-                   class="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors">
-                    <i class="fas fa-chart-bar text-gray-400 mr-2"></i>
+                   class="flex items-center justify-center p-2 border border-dashed border-gray-300 rounded hover:border-purple-500 hover:bg-purple-50 transition-colors text-xs">
+                    <i class="fas fa-chart-bar text-gray-400 mr-1.5 text-xs"></i>
                     <span class="text-gray-700">Отчеты</span>
                 </a>
             </div>
@@ -1411,30 +1431,30 @@ function renderLeadsPage(
     renderHeader($currentUser);
     renderSidebar($currentUser, 'leads');
     ?>
-    <div class="p-6">
-        <div class="mb-8 flex justify-between items-center">
+    <div class="p-4">
+        <div class="mb-4 flex justify-between items-center">
             <div>
-                <h2 class="text-2xl font-bold text-gray-900">Лиды</h2>
-                <p class="text-gray-600">Управление потенциальными клиентами</p>
+                <h2 class="text-lg font-bold text-gray-900">Лиды</h2>
+                <p class="text-xs text-gray-600">Управление потенциальными клиентами</p>
             </div>
             <a href="?page=create_lead" 
-               class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                <i class="fas fa-plus mr-2"></i>Добавить лид
+               class="inline-flex items-center px-3 py-1.5 border border-transparent rounded shadow-sm text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-blue-500">
+                <i class="fas fa-plus mr-1.5 text-xs"></i>Добавить лид
             </a>
         </div>
         
         <!-- Фильтры -->
-        <div class="bg-white rounded-lg shadow p-4 mb-6">
-            <div class="flex flex-wrap gap-2">
+        <div class="bg-white rounded border border-gray-200 p-3 mb-3">
+            <div class="flex flex-wrap gap-1.5">
                 <a href="?page=leads" 
-                   class="px-3 py-1 rounded-full text-sm <?= !$statusFilter ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800 hover:bg-gray-200' ?>">
+                   class="px-2 py-0.5 rounded-full text-xs <?= !$statusFilter ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800 hover:bg-gray-200' ?>">
                     Все (<?= $leadRepository->count() ?>)
                 </a>
                 <?php foreach (['new', 'in_progress', 'qualified', 'converted', 'disqualified'] as $status): 
                     $statusObj = new LeadStatus($status);
                 ?>
                 <a href="?page=leads&status=<?= $status ?>" 
-                   class="px-3 py-1 rounded-full text-sm <?= $statusFilter === $status ? 'bg-' . $statusObj->getColor() . '-100 text-' . $statusObj->getColor() . '-800' : 'bg-gray-100 text-gray-800 hover:bg-gray-200' ?>">
+                   class="px-2 py-0.5 rounded-full text-xs <?= $statusFilter === $status ? 'bg-' . $statusObj->getColor() . '-100 text-' . $statusObj->getColor() . '-800' : 'bg-gray-100 text-gray-800 hover:bg-gray-200' ?>">
                     <?= $statusObj->getName() ?> (<?= $leadRepository->countByStatus($status) ?>)
                 </a>
                 <?php endforeach; ?>
@@ -1442,70 +1462,70 @@ function renderLeadsPage(
         </div>
         
         <!-- Таблица лидов -->
-        <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="bg-white rounded border border-gray-200 overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
+                <table class="min-w-full divide-y divide-gray-200 compact-table">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Клиент</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Контакты</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бюджет</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Клиент</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Контакты</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бюджет</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         <?php foreach ($allLeads as $lead): ?>
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4">
+                            <td class="whitespace-nowrap">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                        <i class="fas fa-user text-blue-600"></i>
+                                    <div class="flex-shrink-0 h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center">
+                                        <i class="fas fa-user text-blue-600 text-xs"></i>
                                     </div>
-                                    <div class="ml-4">
-                                        <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($lead->getContactName()) ?></div>
-                                        <div class="text-sm text-gray-500"><?= htmlspecialchars($lead->getTitle()) ?></div>
+                                    <div class="ml-2">
+                                        <div class="text-xs font-medium text-gray-900"><?= htmlspecialchars($lead->getContactName()) ?></div>
+                                        <div class="text-2xs text-gray-500"><?= htmlspecialchars($lead->getTitle()) ?></div>
                                         <?php if ($lead->getCompany()): ?>
-                                        <div class="text-xs text-gray-400"><?= htmlspecialchars($lead->getCompany()) ?></div>
+                                        <div class="text-2xs text-gray-400"><?= htmlspecialchars($lead->getCompany()) ?></div>
                                         <?php endif; ?>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4">
-                                <div class="text-sm text-gray-900"><?= htmlspecialchars($lead->getContactEmail()) ?></div>
+                            <td class="whitespace-nowrap">
+                                <div class="text-xs text-gray-900"><?= htmlspecialchars((string)$lead->getContactEmail()) ?></div>
                                 <?php if ($lead->getContactPhone()): ?>
-                                <div class="text-sm text-gray-500"><?= $lead->getContactPhone() ?></div>
+                                <div class="text-xs text-gray-500"><?= $lead->getContactPhone() ?></div>
                                 <?php endif; ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="whitespace-nowrap">
                                 <?php $status = $lead->getStatus(); ?>
                                 <span class="status-badge bg-<?= $status->getColor() ?>-100 text-<?= $status->getColor() ?>-800">
                                     <?= $status->getName() ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <td class="whitespace-nowrap text-xs font-medium">
                                 <?= $lead->getEstimatedValue() ?? '—' ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="whitespace-nowrap text-xs text-gray-500">
                                 <?= $lead->getCreatedAt()->format('d.m.Y') ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <div class="flex space-x-2">
+                            <td class="whitespace-nowrap text-xs font-medium">
+                                <div class="flex space-x-1.5">
                                     <a href="?page=lead&id=<?= $lead->getId() ?>" 
                                        class="text-blue-600 hover:text-blue-900" title="Просмотр">
-                                        <i class="fas fa-eye"></i>
+                                        <i class="fas fa-eye text-xs"></i>
                                     </a>
                                     <a href="?page=edit_lead&id=<?= $lead->getId() ?>" 
                                        class="text-yellow-600 hover:text-yellow-900" title="Редактировать">
-                                        <i class="fas fa-edit"></i>
+                                        <i class="fas fa-edit text-xs"></i>
                                     </a>
                                     <?php if ($lead->getStatus()->getValue() === 'qualified'): ?>
                                     <form method="POST" class="inline">
                                         <input type="hidden" name="_action" value="convert_to_deal">
                                         <input type="hidden" name="lead_id" value="<?= $lead->getId() ?>">
                                         <button type="submit" class="text-green-600 hover:text-green-900" title="Конвертировать в сделку">
-                                            <i class="fas fa-handshake"></i>
+                                            <i class="fas fa-handshake text-xs"></i>
                                         </button>
                                     </form>
                                     <?php endif; ?>
@@ -1518,10 +1538,10 @@ function renderLeadsPage(
             </div>
             
             <?php if (empty($allLeads)): ?>
-            <div class="text-center py-12">
-                <i class="fas fa-users text-gray-300 text-4xl mb-4"></i>
-                <p class="text-gray-500">Лиды не найдены</p>
-                <a href="?page=create_lead" class="text-blue-600 hover:text-blue-800 text-sm">Создать первый лид</a>
+            <div class="text-center py-6">
+                <i class="fas fa-users text-gray-300 text-2xl mb-2"></i>
+                <p class="text-sm text-gray-500">Лиды не найдены</p>
+                <a href="?page=create_lead" class="text-blue-600 hover:text-blue-800 text-xs">Создать первый лид</a>
             </div>
             <?php endif; ?>
         </div>
@@ -1538,61 +1558,61 @@ function renderCreateLeadPage(AuthService $auth): void
     renderHeader($currentUser);
     renderSidebar($currentUser, 'leads');
     ?>
-    <div class="p-6">
+    <div class="p-4">
         <div class="max-w-3xl mx-auto">
-            <div class="mb-8">
-                <h2 class="text-2xl font-bold text-gray-900">Новый лид</h2>
-                <p class="text-gray-600">Заполните информацию о потенциальном клиенте</p>
+            <div class="mb-4">
+                <h2 class="text-lg font-bold text-gray-900">Новый лид</h2>
+                <p class="text-xs text-gray-600">Заполните информацию о потенциальном клиенте</p>
             </div>
             
-            <div class="bg-white rounded-lg shadow p-6">
-                <form method="POST" class="space-y-6">
+            <div class="bg-white rounded border border-gray-200 p-4 compact-form">
+                <form method="POST" class="space-y-4">
                     <input type="hidden" name="_action" value="create_lead">
                     
-                    <div>
-                        <label for="title" class="block text-sm font-medium text-gray-700">Название лида *</label>
+                    <div class="form-group">
+                        <label for="title" class="block text-xs font-medium text-gray-700 mb-1">Название лида *</label>
                         <input type="text" id="title" name="title" required 
-                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                               class="block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2.5 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                placeholder="Например: Запрос на интеграцию CRM">
                     </div>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label for="contact_name" class="block text-sm font-medium text-gray-700">Имя контакта *</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="form-group">
+                            <label for="contact_name" class="block text-xs font-medium text-gray-700 mb-1">Имя контакта *</label>
                             <input type="text" id="contact_name" name="contact_name" required 
-                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                   class="block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2.5 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                    placeholder="Иван Иванов">
                         </div>
                         
-                        <div>
-                            <label for="contact_email" class="block text-sm font-medium text-gray-700">Email *</label>
+                        <div class="form-group">
+                            <label for="contact_email" class="block text-xs font-medium text-gray-700 mb-1">Email *</label>
                             <input type="email" id="contact_email" name="contact_email" required 
-                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                   class="block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2.5 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                    placeholder="ivan@example.com">
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label for="contact_phone" class="block text-sm font-medium text-gray-700">Телефон</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="form-group">
+                            <label for="contact_phone" class="block text-xs font-medium text-gray-700 mb-1">Телефон</label>
                             <input type="tel" id="contact_phone" name="contact_phone" 
-                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                   class="block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2.5 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                    placeholder="+7 (912) 345-67-89">
                         </div>
                         
-                        <div>
-                            <label for="company" class="block text-sm font-medium text-gray-700">Компания</label>
+                        <div class="form-group">
+                            <label for="company" class="block text-xs font-medium text-gray-700 mb-1">Компания</label>
                             <input type="text" id="company" name="company" 
-                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                   class="block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2.5 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                    placeholder="ООО 'Рога и копыта'">
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label for="source" class="block text-sm font-medium text-gray-700">Источник</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="form-group">
+                            <label for="source" class="block text-xs font-medium text-gray-700 mb-1">Источник</label>
                             <select id="source" name="source" 
-                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    class="block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2.5 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
                                 <option value="website">Сайт</option>
                                 <option value="phone">Телефон</option>
                                 <option value="email">Email</option>
@@ -1601,28 +1621,28 @@ function renderCreateLeadPage(AuthService $auth): void
                             </select>
                         </div>
                         
-                        <div>
-                            <label for="estimated_value" class="block text-sm font-medium text-gray-700">Ожидаемый бюджет</label>
+                        <div class="form-group">
+                            <label for="estimated_value" class="block text-xs font-medium text-gray-700 mb-1">Ожидаемый бюджет</label>
                             <input type="number" id="estimated_value" name="estimated_value" min="0" step="1000" 
-                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                   class="block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2.5 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                    placeholder="50000">
                         </div>
                     </div>
                     
-                    <div>
-                        <label for="notes" class="block text-sm font-medium text-gray-700">Заметки</label>
-                        <textarea id="notes" name="notes" rows="3" 
-                                  class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    <div class="form-group">
+                        <label for="notes" class="block text-xs font-medium text-gray-700 mb-1">Заметки</label>
+                        <textarea id="notes" name="notes" rows="2" 
+                                  class="block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2.5 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                   placeholder="Дополнительная информация о лиде"></textarea>
                     </div>
                     
-                    <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                    <div class="flex justify-end space-x-2 pt-3 border-t border-gray-200">
                         <a href="?page=leads" 
-                           class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                           class="px-3 py-1.5 border border-gray-300 rounded shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-blue-500">
                             Отмена
                         </a>
                         <button type="submit" 
-                                class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                class="px-3 py-1.5 border border-transparent rounded shadow-sm text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-blue-500">
                             Создать лид
                         </button>
                     </div>
@@ -1653,27 +1673,27 @@ function renderLeadDetailPage(
     renderHeader($currentUser);
     renderSidebar($currentUser, 'leads');
     ?>
-    <div class="p-6">
+    <div class="p-4">
         <div class="max-w-6xl mx-auto">
-            <div class="mb-8 flex justify-between items-start">
+            <div class="mb-4 flex justify-between items-start">
                 <div>
-                    <div class="flex items-center mb-2">
-                        <h2 class="text-2xl font-bold text-gray-900 mr-3"><?= htmlspecialchars($lead->getContactName()) ?></h2>
+                    <div class="flex items-center mb-1">
+                        <h2 class="text-lg font-bold text-gray-900 mr-2"><?= htmlspecialchars($lead->getContactName()) ?></h2>
                         <?php $status = $lead->getStatus(); ?>
                         <span class="status-badge bg-<?= $status->getColor() ?>-100 text-<?= $status->getColor() ?>-800">
                             <?= $status->getName() ?>
                         </span>
                     </div>
-                    <p class="text-gray-600"><?= htmlspecialchars($lead->getTitle()) ?></p>
+                    <p class="text-xs text-gray-600"><?= htmlspecialchars($lead->getTitle()) ?></p>
                     <?php if ($lead->getCompany()): ?>
-                    <p class="text-gray-500"><?= htmlspecialchars($lead->getCompany()) ?></p>
+                    <p class="text-xs text-gray-500"><?= htmlspecialchars($lead->getCompany()) ?></p>
                     <?php endif; ?>
                 </div>
                 
-                <div class="flex space-x-2">
+                <div class="flex space-x-1.5">
                     <a href="?page=edit_lead&id=<?= $lead->getId() ?>" 
-                       class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                        <i class="fas fa-edit mr-2"></i>Редактировать
+                       class="inline-flex items-center px-2.5 py-1 border border-gray-300 rounded shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        <i class="fas fa-edit mr-1.5 text-xs"></i>Редактировать
                     </a>
                     
                     <?php if ($lead->getStatus()->getValue() === 'qualified'): ?>
@@ -1681,94 +1701,94 @@ function renderLeadDetailPage(
                         <input type="hidden" name="_action" value="convert_to_deal">
                         <input type="hidden" name="lead_id" value="<?= $lead->getId() ?>">
                         <button type="submit" 
-                                class="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
-                            <i class="fas fa-handshake mr-2"></i>В сделку
+                                class="inline-flex items-center px-2.5 py-1 border border-transparent rounded shadow-sm text-xs font-medium text-white bg-green-600 hover:bg-green-700">
+                            <i class="fas fa-handshake mr-1.5 text-xs"></i>В сделку
                         </button>
                     </form>
                     <?php endif; ?>
                 </div>
             </div>
             
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <!-- Основная информация -->
-                <div class="lg:col-span-2 space-y-6">
-                    <div class="bg-white rounded-lg shadow">
-                        <div class="px-6 py-4 border-b border-gray-200">
-                            <h3 class="text-lg font-medium text-gray-900">Информация о лиде</h3>
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="bg-white rounded border border-gray-200 compact-card">
+                        <div class="pb-2 border-b border-gray-200">
+                            <h3 class="text-sm font-medium text-gray-900">Информация о лиде</h3>
                         </div>
-                        <div class="p-6">
-                            <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="pt-2">
+                            <dl class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div>
-                                    <dt class="text-sm font-medium text-gray-500">Email</dt>
-                                    <dd class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($lead->getContactEmail()) ?></dd>
+                                    <dt class="text-xs font-medium text-gray-500">Email</dt>
+                                    <dd class="mt-0.5 text-sm text-gray-900"><?= htmlspecialchars((string)$lead->getContactEmail()) ?></dd>
                                 </div>
                                 
                                 <?php if ($lead->getContactPhone()): ?>
                                 <div>
-                                    <dt class="text-sm font-medium text-gray-500">Телефон</dt>
-                                    <dd class="mt-1 text-sm text-gray-900"><?= $lead->getContactPhone() ?></dd>
+                                    <dt class="text-xs font-medium text-gray-500">Телефон</dt>
+                                    <dd class="mt-0.5 text-sm text-gray-900"><?= $lead->getContactPhone() ?></dd>
                                 </div>
                                 <?php endif; ?>
                                 
                                 <div>
-                                    <dt class="text-sm font-medium text-gray-500">Источник</dt>
-                                    <dd class="mt-1 text-sm text-gray-900">
-                                        <i class="fas fa-<?= $lead->getSource()->getIcon() ?> mr-1"></i>
+                                    <dt class="text-xs font-medium text-gray-500">Источник</dt>
+                                    <dd class="mt-0.5 text-sm text-gray-900">
+                                        <i class="fas fa-<?= $lead->getSource()->getIcon() ?> mr-1 text-xs"></i>
                                         <?= $lead->getSource()->getName() ?>
                                     </dd>
                                 </div>
                                 
                                 <div>
-                                    <dt class="text-sm font-medium text-gray-500">Ожидаемый бюджет</dt>
-                                    <dd class="mt-1 text-sm text-gray-900 font-medium">
+                                    <dt class="text-xs font-medium text-gray-500">Ожидаемый бюджет</dt>
+                                    <dd class="mt-0.5 text-sm text-gray-900 font-medium">
                                         <?= $lead->getEstimatedValue() ?? 'Не указан' ?>
                                     </dd>
                                 </div>
                                 
                                 <div>
-                                    <dt class="text-sm font-medium text-gray-500">Дата создания</dt>
-                                    <dd class="mt-1 text-sm text-gray-900"><?= $lead->getCreatedAt()->format('d.m.Y H:i') ?></dd>
+                                    <dt class="text-xs font-medium text-gray-500">Дата создания</dt>
+                                    <dd class="mt-0.5 text-sm text-gray-900"><?= $lead->getCreatedAt()->format('d.m.Y H:i') ?></dd>
                                 </div>
                                 
                                 <div>
-                                    <dt class="text-sm font-medium text-gray-500">Последнее обновление</dt>
-                                    <dd class="mt-1 text-sm text-gray-900"><?= $lead->getUpdatedAt()->format('d.m.Y H:i') ?></dd>
+                                    <dt class="text-xs font-medium text-gray-500">Последнее обновление</dt>
+                                    <dd class="mt-0.5 text-sm text-gray-900"><?= $lead->getUpdatedAt()->format('d.m.Y H:i') ?></dd>
                                 </div>
                             </dl>
                         </div>
                     </div>
                     
                     <!-- Заметки -->
-                    <div class="bg-white rounded-lg shadow">
-                        <div class="px-6 py-4 border-b border-gray-200">
-                            <h3 class="text-lg font-medium text-gray-900">Заметки</h3>
+                    <div class="bg-white rounded border border-gray-200 compact-card">
+                        <div class="pb-2 border-b border-gray-200">
+                            <h3 class="text-sm font-medium text-gray-900">Заметки</h3>
                         </div>
-                        <div class="p-6">
-                            <div class="space-y-4">
+                        <div class="pt-2">
+                            <div class="space-y-3">
                                 <?php foreach (array_reverse($lead->getNotes()) as $note): ?>
-                                <div class="border-l-4 border-blue-500 pl-4 py-2">
+                                <div class="border-l-2 border-blue-500 pl-3 py-1">
                                     <p class="text-sm text-gray-800"><?= htmlspecialchars($note['text']) ?></p>
-                                    <p class="text-xs text-gray-500 mt-1"><?= $note['timestamp']->format('d.m.Y H:i') ?></p>
+                                    <p class="text-xs text-gray-500 mt-0.5"><?= $note['timestamp']->format('d.m.Y H:i') ?></p>
                                 </div>
                                 <?php endforeach; ?>
                                 
                                 <?php if (empty($lead->getNotes())): ?>
-                                <p class="text-gray-500 text-center py-4">Заметок пока нет</p>
+                                <p class="text-gray-500 text-center py-2 text-sm">Заметок пока нет</p>
                                 <?php endif; ?>
                             </div>
                             
-                            <form method="POST" class="mt-6">
+                            <form method="POST" class="mt-4">
                                 <input type="hidden" name="_action" value="update_lead">
                                 <input type="hidden" name="id" value="<?= $lead->getId() ?>">
                                 <div>
                                     <label for="new_note" class="sr-only">Новая заметка</label>
-                                    <textarea id="new_note" name="notes" rows="2" 
-                                              class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    <textarea id="new_note" name="notes" rows="1" 
+                                              class="block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2.5 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                               placeholder="Добавить заметку..."></textarea>
                                 </div>
-                                <div class="mt-2 flex justify-end">
+                                <div class="mt-1.5 flex justify-end">
                                     <button type="submit" 
-                                            class="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                                            class="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700">
                                         Добавить заметку
                                     </button>
                                 </div>
@@ -1778,21 +1798,21 @@ function renderLeadDetailPage(
                 </div>
                 
                 <!-- Боковая панель -->
-                <div class="space-y-6">
+                <div class="space-y-4">
                     <!-- Быстрые действия -->
-                    <div class="bg-white rounded-lg shadow">
-                        <div class="px-4 py-3 border-b border-gray-200">
+                    <div class="bg-white rounded border border-gray-200 compact-card">
+                        <div class="pb-2 border-b border-gray-200">
                             <h3 class="text-sm font-medium text-gray-900">Быстрые действия</h3>
                         </div>
-                        <div class="p-4">
-                            <form method="POST" class="space-y-3">
+                        <div class="pt-2">
+                            <form method="POST" class="space-y-2.5">
                                 <input type="hidden" name="_action" value="update_lead">
                                 <input type="hidden" name="id" value="<?= $lead->getId() ?>">
                                 
                                 <div>
                                     <label class="block text-xs font-medium text-gray-700 mb-1">Изменить статус</label>
                                     <select name="status" 
-                                            class="block w-full border border-gray-300 rounded-md shadow-sm py-1 px-2 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                            class="block w-full border border-gray-300 rounded shadow-sm py-1 px-2 text-xs focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                             onchange="this.form.submit()">
                                         <?php foreach (['new', 'in_progress', 'qualified', 'converted', 'disqualified'] as $status): 
                                             $statusObj = new LeadStatus($status);
@@ -1810,9 +1830,9 @@ function renderLeadDetailPage(
                                         <input type="number" name="estimated_value" 
                                                value="<?= $lead->getEstimatedValue() ? $lead->getEstimatedValue()->getFloatAmount() : '' ?>" 
                                                step="1000" min="0"
-                                               class="flex-1 border border-gray-300 rounded-l-md shadow-sm py-1 px-2 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                               class="flex-1 border border-gray-300 rounded-l shadow-sm py-1 px-2 text-xs focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                         <button type="submit" 
-                                                class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-md px-2 text-sm hover:bg-gray-200">
+                                                class="bg-gray-100 border border-l-0 border-gray-300 rounded-r px-2 text-xs hover:bg-gray-200">
                                             OK
                                         </button>
                                     </div>
@@ -1822,31 +1842,31 @@ function renderLeadDetailPage(
                     </div>
                     
                     <!-- Информация о назначении -->
-                    <div class="bg-white rounded-lg shadow">
-                        <div class="px-4 py-3 border-b border-gray-200">
+                    <div class="bg-white rounded border border-gray-200 compact-card">
+                        <div class="pb-2 border-b border-gray-200">
                             <h3 class="text-sm font-medium text-gray-900">Назначение</h3>
                         </div>
-                        <div class="p-4">
+                        <div class="pt-2">
                             <?php if ($lead->getAssignedTo()): 
                                 $user = $userRepository->findById($lead->getAssignedTo());
                             ?>
                             <div class="flex items-center">
-                                <div class="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                    <i class="fas fa-user text-blue-600 text-sm"></i>
+                                <div class="flex-shrink-0 h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <i class="fas fa-user text-blue-600 text-xs"></i>
                                 </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium text-gray-900"><?= htmlspecialchars($user->getFullName()) ?></p>
-                                    <p class="text-xs text-gray-500"><?= htmlspecialchars(ucfirst($user->getRole())) ?></p>
+                                <div class="ml-2">
+                                    <p class="text-xs font-medium text-gray-900"><?= htmlspecialchars($user->getFullName()) ?></p>
+                                    <p class="text-2xs text-gray-500"><?= htmlspecialchars(ucfirst($user->getRole())) ?></p>
                                 </div>
                             </div>
                             <?php else: ?>
-                            <p class="text-sm text-gray-500">Не назначен</p>
-                            <form method="POST" class="mt-2">
+                            <p class="text-xs text-gray-500">Не назначен</p>
+                            <form method="POST" class="mt-1">
                                 <input type="hidden" name="_action" value="update_lead">
                                 <input type="hidden" name="id" value="<?= $lead->getId() ?>">
                                 <input type="hidden" name="assigned_to" value="<?= $currentUser['user_id'] ?>">
                                 <button type="submit" 
-                                        class="text-xs text-blue-600 hover:text-blue-800">
+                                        class="text-2xs text-blue-600 hover:text-blue-800">
                                     Назначить на себя
                                 </button>
                             </form>
@@ -1874,15 +1894,15 @@ function renderDealsPage(
     renderHeader($currentUser);
     renderSidebar($currentUser, 'deals');
     ?>
-    <div class="p-6">
-        <div class="mb-8 flex justify-between items-center">
+    <div class="p-4">
+        <div class="mb-4 flex justify-between items-center">
             <div>
-                <h2 class="text-2xl font-bold text-gray-900">Сделки</h2>
-                <p class="text-gray-600">Управление коммерческими предложениями</p>
+                <h2 class="text-lg font-bold text-gray-900">Сделки</h2>
+                <p class="text-xs text-gray-600">Управление коммерческими предложениями</p>
             </div>
             <a href="?page=create_deal" 
-               class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                <i class="fas fa-plus mr-2"></i>Новая сделка
+               class="inline-flex items-center px-3 py-1.5 border border-transparent rounded shadow-sm text-xs font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-green-500">
+                <i class="fas fa-plus mr-1.5 text-xs"></i>Новая сделка
             </a>
         </div>
         
@@ -1897,7 +1917,7 @@ function renderDealsPage(
             'closed_lost' => $dealRepository->countByStage('closed_lost'),
         ];
         ?>
-        <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+        <div class="grid grid-cols-3 md:grid-cols-6 gap-2 mb-3">
             <?php foreach ($dealStats as $stage => $count): 
                 $colors = [
                     'prospecting' => 'gray',
@@ -1908,62 +1928,62 @@ function renderDealsPage(
                     'closed_lost' => 'red',
                 ];
             ?>
-            <div class="bg-white rounded-lg shadow p-4 text-center">
-                <div class="text-2xl font-bold text-<?= $colors[$stage] ?>-600"><?= $count ?></div>
-                <div class="text-xs text-gray-500 mt-1"><?= ucfirst(str_replace('_', ' ', $stage)) ?></div>
+            <div class="bg-white rounded border border-gray-200 p-2 text-center">
+                <div class="text-base font-bold text-<?= $colors[$stage] ?>-600"><?= $count ?></div>
+                <div class="text-2xs text-gray-500 mt-0.5"><?= ucfirst(str_replace('_', ' ', $stage)) ?></div>
             </div>
             <?php endforeach; ?>
         </div>
         
         <!-- Таблица сделок -->
-        <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="bg-white rounded border border-gray-200 overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
+                <table class="min-w-full divide-y divide-gray-200 compact-table">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Название</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Стадия</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Сумма</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Вероятность</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Владелец</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Название</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Стадия</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Сумма</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Вероятность</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Владелец</th>
+                            <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         <?php foreach ($allDeals as $deal): ?>
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4">
-                                <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($deal->getTitle()) ?></div>
-                                <div class="text-sm text-gray-500">
+                            <td class="whitespace-nowrap">
+                                <div class="text-xs font-medium text-gray-900"><?= htmlspecialchars($deal->getTitle()) ?></div>
+                                <div class="text-2xs text-gray-500">
                                     <?php 
                                     $lead = $leadRepository->findById($deal->getLeadId());
                                     echo $lead ? htmlspecialchars($lead->getContactName()) : 'Лид не найден';
                                     ?>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="whitespace-nowrap">
                                 <span class="status-badge bg-<?= $deal->getStageColor() ?>-100 text-<?= $deal->getStageColor() ?>-800">
                                     <?= $deal->getStageName() ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td class="whitespace-nowrap text-xs font-medium text-gray-900">
                                 <?= $deal->getAmount() ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="whitespace-nowrap">
                                 <div class="flex items-center">
-                                    <div class="w-24 bg-gray-200 rounded-full h-2 mr-3">
-                                        <div class="bg-blue-600 h-2 rounded-full" style="width: <?= $deal->getProbability() ?>%"></div>
+                                    <div class="w-16 bg-gray-200 rounded-full h-1.5 mr-2">
+                                        <div class="bg-blue-600 h-1.5 rounded-full" style="width: <?= $deal->getProbability() ?>%"></div>
                                     </div>
-                                    <span class="text-sm text-gray-900"><?= $deal->getProbability() ?>%</span>
+                                    <span class="text-xs text-gray-900"><?= $deal->getProbability() ?>%</span>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="whitespace-nowrap text-xs text-gray-500">
                                 <?php 
                                 $owner = $userRepository->findById($deal->getOwnerId());
                                 echo $owner ? htmlspecialchars($owner->getFirstName()) : 'Неизвестно';
                                 ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="whitespace-nowrap text-xs text-gray-500">
                                 <?= $deal->getCreatedAt()->format('d.m.Y') ?>
                             </td>
                         </tr>
@@ -1973,11 +1993,11 @@ function renderDealsPage(
             </div>
             
             <?php if (empty($allDeals)): ?>
-            <div class="text-center py-12">
-                <i class="fas fa-handshake text-gray-300 text-4xl mb-4"></i>
-                <p class="text-gray-500">Сделки не найдены</p>
-                <a href="?page=create_deal" class="text-green-600 hover:text-green-800 text-sm">Создать первую сделку</a>
-                <p class="text-sm text-gray-400 mt-2">Или конвертируйте квалифицированный лид в сделку</p>
+            <div class="text-center py-6">
+                <i class="fas fa-handshake text-gray-300 text-2xl mb-2"></i>
+                <p class="text-sm text-gray-500">Сделки не найдены</p>
+                <a href="?page=create_deal" class="text-green-600 hover:text-green-800 text-xs">Создать первую сделку</a>
+                <p class="text-xs text-gray-400 mt-1">Или конвертируйте квалифицированный лид в сделку</p>
             </div>
             <?php endif; ?>
         </div>
@@ -1999,17 +2019,17 @@ function renderAnalyticsPage(
     renderHeader($currentUser);
     renderSidebar($currentUser, 'analytics');
     ?>
-    <div class="p-6">
-        <div class="mb-8">
-            <h2 class="text-2xl font-bold text-gray-900">Аналитика и отчеты</h2>
-            <p class="text-gray-600">Ключевые метрики и статистика эффективности</p>
+    <div class="p-4">
+        <div class="mb-4">
+            <h2 class="text-lg font-bold text-gray-900">Аналитика и отчеты</h2>
+            <p class="text-xs text-gray-600">Ключевые метрики и статистика эффективности</p>
         </div>
         
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
             <!-- График лидов -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Распределение лидов по статусам</h3>
-                <div class="space-y-4">
+            <div class="bg-white rounded border border-gray-200 compact-card">
+                <h3 class="text-sm font-medium text-gray-900 mb-3">Распределение лидов по статусам</h3>
+                <div class="space-y-3">
                     <?php 
                     $leadStatuses = ['new', 'in_progress', 'qualified', 'converted', 'disqualified'];
                     $totalLeads = $leadStats['total'];
@@ -2019,12 +2039,12 @@ function renderAnalyticsPage(
                         $statusObj = new LeadStatus($status);
                     ?>
                     <div>
-                        <div class="flex justify-between text-sm mb-1">
+                        <div class="flex justify-between text-xs mb-1">
                             <span class="font-medium text-gray-700"><?= $statusObj->getName() ?></span>
                             <span class="text-gray-900"><?= $count ?> (<?= round($percentage, 1) ?>%)</span>
                         </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-<?= $statusObj->getColor() ?>-600 h-2 rounded-full" style="width: <?= $percentage ?>%"></div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5">
+                            <div class="bg-<?= $statusObj->getColor() ?>-600 h-1.5 rounded-full" style="width: <?= $percentage ?>%"></div>
                         </div>
                     </div>
                     <?php endforeach; ?>
@@ -2032,9 +2052,9 @@ function renderAnalyticsPage(
             </div>
             
             <!-- График сделок -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Распределение сделок по стадиям</h3>
-                <div class="space-y-4">
+            <div class="bg-white rounded border border-gray-200 compact-card">
+                <h3 class="text-sm font-medium text-gray-900 mb-3">Распределение сделок по стадиям</h3>
+                <div class="space-y-3">
                     <?php 
                     $stages = ['prospecting', 'qualification', 'proposal', 'negotiation', 'closed_won', 'closed_lost'];
                     $totalDeals = $dealStats['total'];
@@ -2051,12 +2071,12 @@ function renderAnalyticsPage(
                         ];
                     ?>
                     <div>
-                        <div class="flex justify-between text-sm mb-1">
+                        <div class="flex justify-between text-xs mb-1">
                             <span class="font-medium text-gray-700"><?= ucfirst(str_replace('_', ' ', $stage)) ?></span>
                             <span class="text-gray-900"><?= $count ?> (<?= round($percentage, 1) ?>%)</span>
                         </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-<?= $colors[$stage] ?>-600 h-2 rounded-full" style="width: <?= $percentage ?>%"></div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5">
+                            <div class="bg-<?= $colors[$stage] ?>-600 h-1.5 rounded-full" style="width: <?= $percentage ?>%"></div>
                         </div>
                     </div>
                     <?php endforeach; ?>
@@ -2065,65 +2085,65 @@ function renderAnalyticsPage(
         </div>
         
         <!-- Показатели эффективности -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-6">Ключевые показатели</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="text-center p-4 border rounded-lg">
-                    <div class="text-3xl font-bold text-blue-600 mb-2">
+        <div class="bg-white rounded border border-gray-200 compact-card">
+            <h3 class="text-sm font-medium text-gray-900 mb-4">Ключевые показатели</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="text-center p-3 border border-gray-200 rounded">
+                    <div class="text-xl font-bold text-blue-600 mb-1">
                         <?= $totalLeads > 0 ? round(($leadStats['converted'] / $totalLeads * 100), 1) : 0 ?>%
                     </div>
-                    <div class="text-sm text-gray-600">Конверсия лидов</div>
-                    <div class="text-xs text-gray-400 mt-1">лиды → сделки</div>
+                    <div class="text-xs text-gray-600">Конверсия лидов</div>
+                    <div class="text-2xs text-gray-400 mt-0.5">лиды → сделки</div>
                 </div>
                 
-                <div class="text-center p-4 border rounded-lg">
-                    <div class="text-3xl font-bold text-green-600 mb-2">
+                <div class="text-center p-3 border border-gray-200 rounded">
+                    <div class="text-xl font-bold text-green-600 mb-1">
                         <?= $dealStats['total'] > 0 ? round(($dealStats['closed_won'] / $dealStats['total'] * 100), 1) : 0 ?>%
                     </div>
-                    <div class="text-sm text-gray-600">Успешных сделок</div>
-                    <div class="text-xs text-gray-400 mt-1">win rate</div>
+                    <div class="text-xs text-gray-600">Успешных сделок</div>
+                    <div class="text-2xs text-gray-400 mt-0.5">win rate</div>
                 </div>
                 
-                <div class="text-center p-4 border rounded-lg">
-                    <div class="text-3xl font-bold text-purple-600 mb-2">
+                <div class="text-center p-3 border border-gray-200 rounded">
+                    <div class="text-xl font-bold text-purple-600 mb-1">
                         <?= $dealStats['total_value'] ?>
                     </div>
-                    <div class="text-sm text-gray-600">Общий оборот</div>
-                    <div class="text-xs text-gray-400 mt-1">все сделки</div>
+                    <div class="text-xs text-gray-600">Общий оборот</div>
+                    <div class="text-2xs text-gray-400 mt-0.5">все сделки</div>
                 </div>
             </div>
         </div>
         
         <!-- Рекомендации -->
-        <div class="bg-white rounded-lg shadow p-6 mt-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Рекомендации</h3>
-            <div class="space-y-3">
+        <div class="bg-white rounded border border-gray-200 compact-card mt-4">
+            <h3 class="text-sm font-medium text-gray-900 mb-3">Рекомендации</h3>
+            <div class="space-y-2.5">
                 <?php if ($leadStats['qualified'] > 0): ?>
                 <div class="flex items-start">
-                    <i class="fas fa-lightbulb text-yellow-500 mt-1 mr-3"></i>
+                    <i class="fas fa-lightbulb text-yellow-500 mt-0.5 mr-2 text-xs"></i>
                     <div>
-                        <p class="text-sm font-medium text-gray-900"><?= $leadStats['qualified'] ?> квалифицированных лида готовы к конвертации</p>
-                        <p class="text-xs text-gray-500">Рекомендуем создать сделки для этих лидов</p>
+                        <p class="text-xs font-medium text-gray-900"><?= $leadStats['qualified'] ?> квалифицированных лида готовы к конвертации</p>
+                        <p class="text-2xs text-gray-500">Рекомендуем создать сделки для этих лидов</p>
                     </div>
                 </div>
                 <?php endif; ?>
                 
                 <?php if ($leadStats['new'] > 5): ?>
                 <div class="flex items-start">
-                    <i class="fas fa-exclamation-triangle text-red-500 mt-1 mr-3"></i>
+                    <i class="fas fa-exclamation-triangle text-red-500 mt-0.5 mr-2 text-xs"></i>
                     <div>
-                        <p class="text-sm font-medium text-gray-900"><?= $leadStats['new'] ?> новых лидов требуют обработки</p>
-                        <p class="text-xs text-gray-500">Рекомендуем назначить ответственных менеджеров</p>
+                        <p class="text-xs font-medium text-gray-900"><?= $leadStats['new'] ?> новых лидов требуют обработки</p>
+                        <p class="text-2xs text-gray-500">Рекомендуем назначить ответственных менеджеров</p>
                     </div>
                 </div>
                 <?php endif; ?>
                 
                 <?php if ($dealStats['negotiation'] > 0): ?>
                 <div class="flex items-start">
-                    <i class="fas fa-handshake text-green-500 mt-1 mr-3"></i>
+                    <i class="fas fa-handshake text-green-500 mt-0.5 mr-2 text-xs"></i>
                     <div>
-                        <p class="text-sm font-medium text-gray-900"><?= $dealStats['negotiation'] ?> сделок на стадии переговоров</p>
-                        <p class="text-xs text-gray-500">Высокая вероятность закрытия. Уделите внимание этим сделкам</p>
+                        <p class="text-xs font-medium text-gray-900"><?= $dealStats['negotiation'] ?> сделок на стадии переговоров</p>
+                        <p class="text-2xs text-gray-500">Высокая вероятность закрытия. Уделите внимание этим сделкам</p>
                     </div>
                 </div>
                 <?php endif; ?>
